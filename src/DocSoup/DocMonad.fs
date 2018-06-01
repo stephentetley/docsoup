@@ -26,28 +26,29 @@ let private ansMapM (fn:'a -> State -> Ans<'b>) (st0:State) (xs:'a list) : Ans<'
 
 
 // DocMonad is Reader(immutable)+Reader+State+Error
+// WARNING - region and state represent the same thing - must be kept in sync
 type DocMonad<'a> = DocMonad of (Word.Document -> Region -> State -> Ans<'a>)
 
 
 let inline apply1 (ma : DocMonad<'a>) (doc:Word.Document) (focus:Region) (st:State) : Ans<'a>= 
     let (DocMonad f) = ma in f doc focus st
 
-let private unitM (x:'a) : DocMonad<'a> = DocMonad <| fun _ _ st -> Ok(st,x)
+let inline preturn (x:'a) : DocMonad<'a> = DocMonad <| fun _ _ st -> Ok(st,x)
 
 
-let bindM (ma:DocMonad<'a>) (f : 'a -> DocMonad<'b>) : DocMonad<'b> =
+let inline bindM (ma:DocMonad<'a>) (f : 'a -> DocMonad<'b>) : DocMonad<'b> =
     DocMonad <| fun doc focus st0 -> 
         match apply1 ma doc focus st0 with
         | Err msg -> Err msg
         | Ok(st1,a) -> apply1 (f a) doc focus st1
 
-let failM () : DocMonad<'a> = 
-    DocMonad <| fun _ _ _ -> Err "failM"
+let inline pzero () : DocMonad<'a> = 
+    DocMonad <| fun _ _ _ -> Err "fail-pzero"
 
 type DocMonadBuilder() = 
-    member self.Return x    = unitM x
+    member self.Return x    = preturn x
     member self.Bind (p,f)  = bindM p f
-    member self.Zero ()     = failM ()
+    member self.Zero ()     = pzero ()
 
 let (docMonad:DocMonadBuilder) = new DocMonadBuilder()
 
@@ -63,63 +64,45 @@ let fmapM (fn:'a -> 'b) (ma:DocMonad<'a>) : DocMonad<'b> =
 
 
 let (|>>) (ma:DocMonad<'a>) (fn:'a -> 'b) : DocMonad<'b> = fmapM fn ma
+let (<<|) (fn:'a -> 'b) (ma:DocMonad<'a>) : DocMonad<'b> = fmapM fn ma
+
 
 let liftM (fn:'a -> 'x) (ma:DocMonad<'a>) : DocMonad<'x> = fmapM fn ma
 
 let liftM2 (fn:'a -> 'b -> 'x) (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'x> = 
-    DocMonad <| fun doc focus st0 -> 
-        match apply1 ma doc focus st0 with
-        | Err msg -> Err msg
-        | Ok (st1,a) -> 
-            match apply1 mb doc focus st1 with
-            | Err msg -> Err msg
-            | Ok (st2,b) -> Ok (st2, fn a b)
+    docMonad { 
+        let! a = ma
+        let! b = mb
+        return (fn a b)
+    }
 
 let liftM3 (fn:'a -> 'b -> 'c -> 'x) (ma:DocMonad<'a>) (mb:DocMonad<'b>) (mc:DocMonad<'c>) : DocMonad<'x> = 
-    DocMonad <| fun doc focus st0 -> 
-        match apply1 ma doc focus st0 with
-        | Err msg -> Err msg
-        | Ok (st1,a) -> 
-            match apply1 mb doc focus st1 with
-            | Err msg -> Err msg
-            | Ok (st2,b) -> 
-                match apply1 mc doc focus st2 with
-                | Err msg -> Err msg
-                | Ok (st3,c) -> Ok (st3, fn a b c)
+    docMonad { 
+        let! a = ma
+        let! b = mb
+        let! c = mc
+        return (fn a b c)
+    }
 
 let liftM4 (fn:'a -> 'b -> 'c -> 'd -> 'x) (ma:DocMonad<'a>) (mb:DocMonad<'b>) (mc:DocMonad<'c>) (md:DocMonad<'d>) : DocMonad<'x> = 
-    DocMonad <| fun doc focus st0 -> 
-        match apply1 ma doc focus st0 with
-        | Err msg -> Err msg
-        | Ok (st1,a) -> 
-            match apply1 mb doc focus st1 with
-            | Err msg -> Err msg
-            | Ok (st2,b) -> 
-                match apply1 mc doc focus st2 with
-                | Err msg -> Err msg
-                | Ok (st3,c) -> 
-                    match apply1 md doc focus st3 with 
-                    | Err msg -> Err msg
-                    | Ok (st4,d) -> Ok (st4, fn a b c d)
+    docMonad { 
+        let! a = ma
+        let! b = mb
+        let! c = mc
+        let! d = md
+        return (fn a b c d)
+    }
 
 
 let liftM5 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'x) (ma:DocMonad<'a>) (mb:DocMonad<'b>) (mc:DocMonad<'c>) (md:DocMonad<'d>) (me:DocMonad<'e>) : DocMonad<'x> = 
-    DocMonad <| fun doc focus st0 -> 
-        match apply1 ma doc focus st0 with
-        | Err msg -> Err msg
-        | Ok (st1,a) -> 
-            match apply1 mb doc focus st1 with 
-            | Err msg -> Err msg
-            | Ok (st2,b) -> 
-                match apply1 mc doc focus st2 with 
-                | Err msg -> Err msg
-                | Ok (st3,c) -> 
-                    match apply1 md doc focus st3 with 
-                    | Err msg -> Err msg
-                    | Ok (st4, d) -> 
-                        match apply1 me doc focus st4 with 
-                        | Err msg -> Err msg
-                        | Ok (st5, e) -> Ok (st5, fn a b c d e)
+    docMonad { 
+        let! a = ma
+        let! b = mb
+        let! c = mc
+        let! d = md
+        let! e = me
+        return (fn a b c d e)
+    }
 
 let tupleM2 (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'a * 'b> = 
     liftM2 (fun a b -> (a,b)) ma mb
@@ -155,36 +138,45 @@ let (<|>) (ma:DocMonad<'a>) (mb:DocMonad<'a>) : DocMonad<'a> = alt ma mb
 
 // Applicative's (<*>)
 let apM (mf:DocMonad<'a ->'b>) (ma:DocMonad<'a>) : DocMonad<'b> = 
-    DocMonad <| fun doc focus st0 ->
-        match apply1 mf doc focus st0 with
-        | Err msg -> Err msg
-        | Ok (st1,fn) -> 
-            match apply1 ma doc focus st1 with
-            | Err msg -> Err msg
-            | Ok (st2,a) -> Ok (st2, fn a)
+    docMonad { 
+        let! fn = mf
+        let! a = ma
+        return (fn a) 
+    }
 
 // Perform two actions in sequence. Ignore the results of the second action if both succeed.
 let seqL (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'a> = 
-    DocMonad <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err msg -> Err msg
-        | Ok (st1,a) -> 
-            match apply1 mb doc focus st1 with
-            | Err msg -> Err msg
-            | Ok (st2,_) -> Ok (st2, a)
+    docMonad { 
+        let! a = ma
+        let! b = mb
+        return a
+    }
 
 // Perform two actions in sequence. Ignore the results of the first action if both succeed.
 let seqR (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'b> = 
-    DocMonad <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err msg -> Err msg
-        | Ok (st1,_) -> 
-            match apply1 mb doc focus st1 with
-            | Err msg -> Err msg
-            | Ok (st2,b) -> Ok (st2,b)
+    docMonad { 
+        let! a = ma
+        let! b = mb
+        return b
+    }
 
 let (.>>) (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'a> = seqL ma mb
 let (>>.) (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'b> = seqR ma mb
+
+let many (ma:DocMonad<'a>) : DocMonad<'a list> = 
+    DocMonad <| fun doc focus st0 ->
+        let rec work ac st = 
+            match apply1 ma doc focus st with
+            | Err _ -> Ok (st,List.rev ac)
+            | Ok (st1,a) -> work (a :: ac) st1
+        work [] st0
+
+let many1 (ma:DocMonad<'a>) : DocMonad<'a list> = 
+    docMonad { 
+        let! a = ma
+        let! rest = many ma
+        return (a::rest)
+    }
 
 
 // DocMonad specific operations
@@ -212,7 +204,7 @@ let throwError (msg:string) : DocMonad<'a> =
 let swapError (msg:string) (ma:DocMonad<'a>) : DocMonad<'a> = 
     DocMonad <| fun doc focus st0 ->
         match apply1 ma doc focus st0 with
-        | Err msg -> Err msg
+        | Err _ -> Err msg
         | Ok (st1,a) -> Ok (st1,a)
 
 let (<?>) (ma:DocMonad<'a>) (msg:string) : DocMonad<'a> = swapError msg ma
@@ -223,42 +215,15 @@ let augmentError (fn:string -> string) (ma:DocMonad<'a>) : DocMonad<'a> =
         | Err msg -> Err <| fn msg
         | Ok (st1,a) -> Ok (st1,a)
 
-
-let satisfy (test:char -> bool) : DocMonad<char> = 
+let withInput (fn:string -> Ans<'a>) : DocMonad<'a> = 
     DocMonad <| fun doc focus st0 ->
-        match st0 with
-        | State(s) -> 
-            try
-                let a = s.[0]
-                let rest = s.[1..]
-                if test a then Ok (State rest,a) else Err "satisfy"
-            with 
-            | ex -> Err "satisfy"
+        try
+            match st0 with | State(s) -> fn s
+        with    
+        | ex -> Err "withInput"
 
 
-let pchar (ch:char) : DocMonad<char> = 
-    satisfy (fun c1 -> c1 = ch) <?> "pchar"
 
-let pstring (str:string) :DocMonad<string> = 
-    DocMonad <| fun doc focus st0 ->
-        match st0 with
-        | State(s) -> 
-            try
-                let upper = str.Length - 1 
-                let ans = s.[0..upper]
-                let rest = s.[upper+1..]
-                if ans = str then Ok (State rest,ans) else Err "pstring"
-            with 
-            | ex -> Err "satisfy"
-
-
-let anyChar : DocMonad<char> = 
-    satisfy (fun _ -> true) <?> "anyChar"
-
-
-let newline : DocMonad<char> = 
-    let n1 = (fun _ -> '\n')
-    pchar '\n' <|> (pstring "\r\n" |>> n1) <|> (pchar '\r' |>> n1)
 
 // Get the text in the currently focused region.
 

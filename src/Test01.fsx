@@ -3,9 +3,11 @@
 open Microsoft.Office.Interop
 
 #load @"DocSoup\Base.fs"
-open DocSoup.Base
 #load @"DocSoup\DocMonad.fs"
+#load @"DocSoup\CharParsers.fs"
+open DocSoup.Base
 open DocSoup.DocMonad
+open DocSoup.CharParsers
 
 // Note to self, this test doc is not "well formed". 
 // Textual table data is often not split into rows and columns.
@@ -105,5 +107,5 @@ let test09 () =
     printfn "%A" <| runOnFileE proc testDoc
 
 let test10 () = 
-    let proc : DocMonad<char> = newline >>. anyChar
+    let proc : DocMonad<_> = newline >>. pstring "Event"
     runOnFileE proc testDoc |> printfn "%A"
