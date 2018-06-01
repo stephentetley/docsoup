@@ -103,3 +103,7 @@ let test09 () =
         return (i,xs)
     }
     printfn "%A" <| runOnFileE proc testDoc
+
+let test10 () = 
+    let proc : DocMonad<char> = newline >>. anyChar
+    runOnFileE proc testDoc |> printfn "%A"

@@ -2,8 +2,7 @@
 module DocSoup.Base
 
 open System.IO
-open System.Collections
-open System.Collections.Generic
+open System.Text.RegularExpressions
 
 // Add references via the COM tab for Office and Word
 // All the PIA stuff online is outdated for Office 365 / .Net 4.5 / VS2015 
@@ -32,4 +31,7 @@ let extractRegion (range:Word.Range) : Region = { RegionStart = range.Start; Reg
     
 let maxRegion (doc:Word.Document) : Region = extractRegion <| doc.Range()
 
+let regionText (focus:Region) (doc:Word.Document) : string = 
+    let range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
+    Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
 
