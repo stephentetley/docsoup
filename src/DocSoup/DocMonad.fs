@@ -7,7 +7,19 @@ open Microsoft.Office.Interop
 open DocSoup.Base
 
 
+type Ans<'a> = 
+    | Err of string
+    | Ok of 'a
 
+let private ansMapM (fn:'a -> Ans<'b>) (xs:'a list) : Ans<'b list> = 
+    let rec work ac ys = 
+        match ys with
+        | [] -> Ok <| List.rev ac
+        | z :: zs -> 
+            match fn z with
+            | Err msg -> Err msg
+            | Ok a -> work (a::ac) zs
+    work [] xs
 
 // DocMonad is Reader(immutable)+Reader+Error
 type DocMonad<'a> = DocMonad of (Word.Document -> Region -> Ans<'a>)
@@ -29,7 +41,7 @@ let bindM (ma:DocMonad<'a>) (f : 'a -> DocMonad<'b>) : DocMonad<'b> =
 
 type DocMonadBuilder() = 
     member self.Return x    = unitM x
-    member self.Bind (p,f) = bindM p f
+    member self.Bind (p,f)  = bindM p f
     member self.Zero ()     = unitM ()
 
 let (docMonad:DocMonadBuilder) = new DocMonadBuilder()
@@ -37,7 +49,9 @@ let (docMonad:DocMonadBuilder) = new DocMonadBuilder()
 // Common monadic operations
 let fmapM (fn:'a -> 'b) (ma:DocMonad<'a>) : DocMonad<'b> = 
     DocMonad <| fun doc focus -> 
-        Base.fmapM fn (apply1 ma doc focus)
+       match apply1 ma doc focus with
+       | Err msg -> Err msg
+       | Ok a -> Ok (fn a)
 
 
 let liftM (fn:'a -> 'x) (ma:DocMonad<'a>) : DocMonad<'x> = fmapM fn ma
@@ -111,7 +125,14 @@ let tupleM5 (ma:DocMonad<'a>) (mb:DocMonad<'b>) (mc:DocMonad<'c>) (md:DocMonad<'
 
 let sequenceM (source:DocMonad<'a> list) : DocMonad<'a list> = 
     DocMonad <| fun doc focus -> 
-        Base.sequenceM <| List.map (fun fn -> apply1 fn doc focus) source
+        let rec work ac ys = 
+            match ys with
+            | [] -> Ok <| List.rev ac
+            | ma :: zs -> 
+                match apply1 ma doc focus with
+                | Err msg -> Err msg
+                | Ok a -> work (a::ac) zs
+        work [] source
 
 // Left biased choice, if ``ma`` succeeds return its result, otherwise try ``mb``.
 let alt (ma:DocMonad<'a>) (mb:DocMonad<'a>) : DocMonad<'a> = 
