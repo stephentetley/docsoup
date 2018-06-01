@@ -107,5 +107,11 @@ let test09 () =
     printfn "%A" <| runOnFileE proc testDoc
 
 let test10 () = 
-    let proc : DocMonad<_> = newline >>. pstring "Event"
+    let proc : DocMonad<_> = spaces1 >>. pstringCI "EVENT"
     runOnFileE proc testDoc |> printfn "%A"
+
+let test11 () = 
+    let proc : DocMonad<_> = anyString 6
+    runOnFileE proc testDoc |> printfn "%A"
+
+

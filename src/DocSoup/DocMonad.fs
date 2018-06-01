@@ -42,13 +42,40 @@ let inline bindM (ma:DocMonad<'a>) (f : 'a -> DocMonad<'b>) : DocMonad<'b> =
         | Err msg -> Err msg
         | Ok(st1,a) -> apply1 (f a) doc focus st1
 
+let forExprM (source: seq<'a>) (fn: 'a -> DocMonad<unit>) : DocMonad<unit> = 
+    DocMonad <| fun doc focus st0 -> 
+        let rec work st ys = 
+            match ys with
+            | [] -> Ok (st, ())
+            | z :: zs -> 
+                match apply1 (fn z) doc focus st with
+                | Err msg -> Err msg
+                | Ok (st1,a) -> work st1 zs
+        work st0 (Seq.toList source)
+
+let combineM (ma:DocMonad<unit>) (mb:DocMonad<unit>) : DocMonad<unit> = 
+    DocMonad <| fun doc focus st0 -> 
+        match apply1 ma doc focus st0 with
+        | Err msg -> Err msg
+        | Ok(st1,a) -> 
+            match apply1 mb doc focus st1 with
+            | Err msg -> Err msg
+            | Ok(st2,a) -> Ok (st2, ())
+
+let delayM (fn:unit -> DocMonad<'a>) : DocMonad<'a> = 
+    bindM (preturn ()) fn 
+
+
 let inline pzero () : DocMonad<'a> = 
     DocMonad <| fun _ _ _ -> Err "fail-pzero"
 
 type DocMonadBuilder() = 
-    member self.Return x    = preturn x
-    member self.Bind (p,f)  = bindM p f
-    member self.Zero ()     = pzero ()
+    member self.Return x        = preturn x
+    member self.Bind (p,f)      = bindM p f
+    member self.Zero ()         = pzero ()
+    member self.For xs ma       = forExprM xs ma
+    member self.Combine ma mb   = combineM ma mb
+    member self.Delay fn        = delayM fn
 
 let (docMonad:DocMonadBuilder) = new DocMonadBuilder()
 
@@ -162,6 +189,18 @@ let seqR (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'b> =
 
 let (.>>) (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'a> = seqL ma mb
 let (>>.) (ma:DocMonad<'a>) (mb:DocMonad<'b>) : DocMonad<'b> = seqR ma mb
+
+let count (ntimes:int) (ma:DocMonad<'a>) : DocMonad<'a []> = 
+    DocMonad <| fun doc focus st0 ->
+        let rec work ac ix st = 
+            if ix < ntimes then                
+                match apply1 ma doc focus st with
+                | Err msg -> Err msg
+                | Ok (st1,a) -> work (a :: ac) (ix+1) st1
+            else 
+                Ok (st, List.toArray <| List.rev ac)
+        work [] 0 st0
+
 
 let many (ma:DocMonad<'a>) : DocMonad<'a list> = 
     DocMonad <| fun doc focus st0 ->
