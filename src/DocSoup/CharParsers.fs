@@ -153,4 +153,4 @@ let eof : DocMonad<unit> =
 
 // TODO - whats the preferred way of char[] -> string?
 let anyString (ntimes:int32) : DocMonad<string> = 
-    count ntimes (newline <|> anyChar) |>> fun arr -> System.String.Join("",arr)
+    count ntimes (newline <|> anyChar) |>> fun arr -> System.String.Concat(arr)
