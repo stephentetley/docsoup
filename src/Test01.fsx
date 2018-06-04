@@ -22,8 +22,8 @@ let showTable (t1 : Word.Table) =
 let shorten (s:string) = if s.Length > 10 then s.[0..9]+"..." else s
 
 let test01 () = 
-    let proc : DocMonad<unit> = 
-        docMonad { 
+    let proc : DocParser<unit> = 
+        docParse { 
             do! fmapM (printfn "Sections: %i")      countSections
             do! fmapM (printfn "Paragraphs: %i")    countParagraphs
             do! fmapM (printfn "Tables: %i")        countTables
@@ -92,7 +92,7 @@ let test07 () =
 
 
 let test08 () = 
-    let proc = docMonad { 
+    let proc = docParse { 
         let! i = countTables
         let! xs = mapTablesWith (fmapM shorten cleanText)
         return (i,xs)
@@ -100,18 +100,18 @@ let test08 () =
     printfn "%A" <| runOnFileE proc testDoc
 
 let test09 () = 
-    let proc = docMonad { 
+    let proc = docParse { 
         let! (i,xs) = table 3 <| tupleM2 (countCells) (mapCellsWith (fmapM shorten cleanText))
         return (i,xs)
     }
     printfn "%A" <| runOnFileE proc testDoc
 
 let test10 () = 
-    let proc : DocMonad<_> = spaces1 >>. pstringCI "EVENT"
+    let proc : DocParser<_> = spaces1 >>. pstringCI "EVENT"
     runOnFileE proc testDoc |> printfn "%A"
 
 let test11 () = 
-    let proc : DocMonad<_> = anyString 6
+    let proc : DocParser<_> = anyString 6
     runOnFileE proc testDoc |> printfn "%A"
 
 
