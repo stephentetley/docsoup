@@ -31,6 +31,10 @@ let extractRegion (range:Word.Range) : Region = { RegionStart = range.Start; Reg
     
 let maxRegion (doc:Word.Document) : Region = extractRegion <| doc.Range()
 
+let getRange (region:Region)  (doc:Word.Document) : Word.Range = 
+    doc.Range(rbox <| region.RegionStart, rbox <| region.RegionEnd - 1)
+
+
 let regionText (focus:Region) (doc:Word.Document) : string = 
     let range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
     Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")

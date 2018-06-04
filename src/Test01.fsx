@@ -114,4 +114,27 @@ let test11 () =
     let proc : DocParser<_> = anyString 6
     runOnFileE proc testDoc |> printfn "%A"
 
+let test12 () = 
+    let proc : DocParser<_> = spaces1 >>. manyTill letter spaces1
+    runOnFileE proc testDoc |> printfn "%A"
 
+let test13 () = 
+    let proc : DocParser<_> = spaces1 >>. many1Till letter spaces1
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test14 () = 
+    let proc : DocParser<_> = spaces1 >>. restOfLine true
+    runOnFileE proc testDoc |> printfn "%s"
+
+let test15 () = 
+    let proc : DocParser<_> = between spaces1 spaces1 (restOfLine false)
+    runOnFileE proc testDoc |> printfn "%A"
+
+
+let test16 () = 
+    let proc : DocParser<_> = findText "Site Name"
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test17 () = 
+    let proc : DocParser<_> = findText "Site Name" >>= getRegionText
+    runOnFileE proc testDoc |> printfn "%A"

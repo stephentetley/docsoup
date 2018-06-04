@@ -192,6 +192,27 @@ let seqR (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'b> =
 let (.>>) (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'a> = seqL ma mb
 let (>>.) (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'b> = seqR ma mb
 
+
+
+let softOption (ma:DocParser<'a>) : DocParser<'a option> = 
+    DocParser <| fun doc focus st0 ->
+        match apply1 ma doc focus st0 with
+        | Err _ -> Ok (st0, None)
+        | Ok (_,a) -> Ok (st0, Some a)
+
+let optional (ma:DocParser<'a>) : DocParser<'a option> = 
+    DocParser <| fun doc focus st0 ->
+        match apply1 ma doc focus st0 with
+        | Err _ -> Ok (st0, None)
+        | Ok (st1,a) -> Ok (st1, Some a)
+
+let optionalz (ma:DocParser<'a>) : DocParser<unit> = 
+    DocParser <| fun doc focus st0 ->
+        match apply1 ma doc focus st0 with
+        | Err _ -> Ok (st0, ())
+        | Ok (st1,_) -> Ok (st1, ())
+
+
 let count (ntimes:int) (ma:DocParser<'a>) : DocParser<'a []> = 
     DocParser <| fun doc focus st0 ->
         let rec work ac ix st = 
@@ -202,6 +223,10 @@ let count (ntimes:int) (ma:DocParser<'a>) : DocParser<'a []> =
             else 
                 Ok (st, List.toArray <| List.rev ac)
         work [] 0 st0
+
+let between (openP:DocParser<'z1>) (closeP:DocParser<'z2>) (p:DocParser<'a>) : DocParser<'a> = 
+    openP >>. (p .>> closeP)
+
 
 
 let many (ma:DocParser<'a>) : DocParser<'a list> = 
@@ -234,6 +259,44 @@ let sepBy1 (p:DocParser<'a>) (sep:DocParser<'b>) : DocParser<'a list> =
         let! rest = many (sep >>. p)
         return (a::rest)
     }
+
+// The last sep is optional.
+let sepEndBy (p:DocParser<'a>) (sep:DocParser<'b>) : DocParser<'a list> = 
+    let some = 
+        docParse {
+            let! a = p
+            let! rest = many (sep >>. p)
+            return (a::rest)
+        }
+    (some .>> optional sep) <|> preturn []
+
+
+// The last sep is optional.
+let sepEndBy1 (p:DocParser<'a>) (sep:DocParser<'b>) : DocParser<'a list> = 
+    let some = 
+        docParse {
+            let! a = p
+            let! rest = many (sep >>. p)
+            return (a::rest)
+        }
+    some .>> optional sep
+    
+let manyTill (p:DocParser<'a>) (terminate:DocParser<'b>) : DocParser<'a list> = 
+    let rec some ac = 
+        optional terminate >>= fun opt -> 
+        match opt with
+        | Some _ -> preturn (List.rev ac)
+        | None -> p >>= fun a -> some (a::ac)
+    some []
+    
+let many1Till (p:DocParser<'a>) (terminate:DocParser<'b>) : DocParser<'a list> = 
+    let rec some ac = 
+        p >>= fun a -> 
+        optional terminate >>= fun opt -> 
+        match opt with
+        | Some _ -> preturn (List.rev (a::ac))
+        | None -> some (a::ac)
+    some []
 
 
 // Run functions
@@ -334,17 +397,6 @@ let liftOperation (fn : Word.Range -> 'a) : DocParser<'a> =
         | ex -> Err <| ex.ToString()
 
 
-let optional (ma:DocParser<'a>) : DocParser<'a option> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err _ -> Ok (st0, None)
-        | Ok (st1,a) -> Ok (st1, Some a)
-
-let optionalz (ma:DocParser<'a>) : DocParser<unit> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err _ -> Ok (st0, ())
-        | Ok (st1,_) -> Ok (st1, ())
 
 // Range delimited.
 let countTables : DocParser<int> = 
@@ -409,4 +461,24 @@ let mapCellsWith (ma:DocParser<'a>) : DocParser<'a list> =
             ansMapM (fun cell st -> let region = extractRegion (cell :> Word.Cell).Range in apply1 ma doc region st) st0 cells
         with
         | ex -> Err <| ex.ToString() 
+
+
+let findText (search:string) : DocParser<Region> =
+    DocParser <| fun doc focus st0 -> 
+        printfn "Focus: %A" focus
+        let range1 = getRange focus doc
+        printfn "range1: %A" range1
+        range1.Find.ClearFormatting ()
+        printfn "range1: formattting cleared."
+        if range1.Find.Execute (FindText = rbox search) then
+            printfn "Ok"
+            Ok(st0, extractRegion range1)
+        else
+            printfn "Err"
+            Err "findText - not found"
+    
         
+let getRegionText (region:Region) : DocParser<string> =
+    DocParser <| fun doc focus st0 -> 
+        let text = regionText region doc 
+        Ok (st0, text)

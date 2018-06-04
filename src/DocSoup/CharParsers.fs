@@ -4,6 +4,8 @@ open DocSoup.DocMonad
 
 // We need the regular parser combinators for data extraction, e.g. int, 
 // float, digit, letter, etc.
+// It actually might be nicer to "embed" FParsec as it is already optimized.
+// This is to consider later.
 
 
 let satisfy (test:char -> bool) : DocParser<char> = 
@@ -143,6 +145,9 @@ let newline : DocParser<char> =
     let rOptn = pchar '\r' .>> optionalz (pchar '\n')
     (pchar '\n' <|> rOptn) |>> fun _ -> '\n'
 
+let newlinez : DocParser<unit> = newline |>> ignore
+
+
 let spaces : DocParser<unit> = 
     let white1 = satisfy System.Char.IsWhiteSpace |>> ignore
     many (crlf <|> white1) |>> ignore
@@ -158,6 +163,11 @@ let eof : DocParser<unit> =
 let anyString (ntimes:int32) : DocParser<string> = 
     count ntimes (newline <|> anyChar) |>> fun arr -> System.String.Concat(arr)
 
-//let restOfLine (skipNewLine:bool) : DocParserString = 
-//    manyTill 
+let restOfLine (skipNewLine:bool) : DocParser<string> = 
+    manyTill anyChar (eof <|> newlinez) >>= fun ans ->
+    let ans1 = System.String.Concat(ans)
+    if skipNewLine then
+        optionalz newline >>= fun _ -> preturn ans1
+    else preturn ans1
+    
         
