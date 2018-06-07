@@ -174,6 +174,19 @@ let seqR (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'b> =
 let (.>>>) (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'a> = seqL ma mb
 let (>>>.) (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'b> = seqR ma mb
 
+
+let mapM (source:'a list) (p: 'a -> DocSoup<'b>) : DocSoup<'b list> = 
+    DocSoup <| fun doc focus -> 
+        let rec work ac ys = 
+            match ys with
+            | [] -> Ok <| List.rev ac
+            | z :: zs -> 
+                match apply1 (p z) doc focus with
+                | Err msg -> Err msg
+                | Ok ans -> work (ans::ac) zs
+        work [] source
+
+
 let optional (ma:DocSoup<'a>) : DocSoup<'a option> = 
     DocSoup <| fun doc focus ->
         match apply1 ma doc focus with
@@ -205,14 +218,24 @@ let textFallBack (ma:DocSoup<'a>) : DocSoup<FallBackResult<'a>> =
 
 let runOnFile (ma:DocSoup<'a>) (fileName:string) : Result<'a> =
     if System.IO.File.Exists (fileName) then
-        let app = new Word.ApplicationClass (Visible = true) :> Word.Application
-        let doc = app.Documents.Open(FileName = ref (fileName :> obj))
-        let region1 = maxRegion doc
-        let ans = apply1 ma doc region1
-        doc.Close(SaveChanges = rbox false)
-        app.Quit()
-        ans
-    else Err <| sprintf "Cannot find file %s" fileName
+        let app = new Word.ApplicationClass (Visible = false) :> Word.Application
+        try 
+            let doc = app.Documents.Open(FileName = ref (fileName :> obj))
+            let region1 = maxRegion doc
+            let ans = apply1 ma doc region1
+            doc.Close(SaveChanges = rbox false)
+            app.Quit()
+            ans
+        with
+        | ex -> 
+            try 
+                app.Quit ()
+                Err ex.Message
+            with
+            | _ -> Err ex.Message
+                
+    else 
+        Err <| sprintf "Cannot find file %s" fileName
 
 
 let runOnFileE (ma:DocSoup<'a>) (fileName:string) : 'a =
@@ -237,18 +260,91 @@ let focus (region:Region) (ma:DocSoup<'a>) : DocSoup<'a> =
 
 let fparse (p:TextParser<'a>) : DocSoup<'a> = 
     DocSoup <| fun doc focus -> execFParsec doc focus p 
-        
-let getFocusText : DocSoup<string> =
+
+
+/// This gets the text within the cuurent focus!        
+let getText : DocSoup<string> =
     DocSoup <| fun doc focus -> 
         let text = regionText focus doc 
         Ok text
         
 
-let findText (search:string) : DocSoup<Region> =
+let findText (search:string) (matchCase:bool) : DocSoup<Region> =
     DocSoup <| fun doc focus  -> 
         let range1 = getRange focus doc
         range1.Find.ClearFormatting ()
-        if range1.Find.Execute (FindText = rbox search) then
+        if range1.Find.Execute (FindText = rbox search, 
+                                MatchCase = rbox matchCase,
+                                MatchWildcards = rbox false,
+                                Forward = rbox true) then
             Ok <| extractRegion range1
         else
             Err <| sprintf "findText - '%s' not found" search
+
+let findPattern (search:string) : DocSoup<Region> =
+    DocSoup <| fun doc focus  -> 
+        let range1 = getRange focus doc
+        range1.Find.ClearFormatting ()
+        if range1.Find.Execute (FindText = rbox search, 
+                                MatchWildcards = rbox true,
+                                Forward = rbox true) then
+            Ok <| extractRegion range1
+        else
+            Err <| sprintf "findText - '%s' not found" search
+
+let findTextMany (search:string) (matchCase:bool) : DocSoup<Region list> =
+    let rec work (rng:Word.Range) (ac: Region list) : Result<Region list> = 
+        rng.Find.Execute (FindText = rbox search, 
+                            MatchCase = rbox matchCase,
+                            MatchWildcards = rbox false,
+                            Forward = rbox true) |> ignore
+        if rng.Find.Found then
+            let region = extractRegion rng
+            work rng (region::ac)
+        else
+            Ok <| List.rev ac
+
+    DocSoup <| fun doc focus  -> 
+        let range1 = getRange focus doc
+        range1.Find.ClearFormatting ()
+        work range1 []
+
+let findPatternMany (search:string) : DocSoup<Region list> =
+    let rec work (rng:Word.Range) (ac: Region list) : Result<Region list> = 
+        rng.Find.Execute (FindText = rbox search, 
+                            MatchWildcards = rbox true,
+                            Forward = rbox true) |> ignore
+        if rng.Find.Found then
+            let region = extractRegion rng
+            work rng (region::ac)
+        else
+            Ok <| List.rev ac
+
+    DocSoup <| fun doc focus  -> 
+        let range1 = getRange focus doc
+        range1.Find.ClearFormatting ()
+        work range1 []
+
+
+/// Note - the results will be within the current focus!
+let tables : DocSoup<Region []> = 
+    DocSoup <| fun doc focus -> 
+        let range0:Word.Range = doc.Range()
+        let allTables:Word.Table list = (range0.Tables |> Seq.cast<Word.Table> |> Seq.toList)
+        let allRegions = List.map (fun (tbl:Word.Table) -> tbl.Range |> extractRegion) allTables
+        let ans = List.filter (isSubregionOf focus) allRegions |> List.toArray
+        Ok <| ans
+
+
+/// Note - the results are indexed within the current focus.
+/// Note - this is zero indexed (unlike Word's automation API)
+let getTable(index:int) : DocSoup<Region> = 
+    tables >>>= fun arr -> 
+    if index >= arr.Length || index < 0 then 
+        throwError 
+            (sprintf "getTable - index out of range ix:%i [tables: %i]" index arr.Length)
+    else 
+        sreturn arr.[index]
+
+
+

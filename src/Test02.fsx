@@ -22,3 +22,28 @@ let test01 () =
         spaces1 >>. many1Till letter spaces1 |>> System.String.Concat
     let proc : DocSoup<_> = fparse parser1 |>>> id
     runOnFileE proc testDoc |> printfn "%s"
+
+let test02 () = 
+    let proc : DocSoup<_> = findText "Discharge" true
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test03 () = 
+    let proc : DocSoup<_> = findTextMany "Discharge" true
+    runOnFileE proc testDoc |> List.iter (printfn "%A")
+
+let test04 () = 
+    let proc : DocSoup<_> = tables
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+let test05 () = 
+    let proc : DocSoup<_> = findPattern "D??charge"
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test06 () = 
+    let proc : DocSoup<_> = 
+        findPatternMany "D??charge" >>>= fun res -> mapM res (fun rgn -> focus rgn getText)
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+let temp01 (ix:int) = 
+    let proc : DocSoup<_> = getTable ix
+    runOnFileE proc testDoc |> printfn "%A"
