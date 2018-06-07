@@ -1,4 +1,7 @@
-﻿module DocSoup.CharParsers
+﻿// Copyright (c) Stephen Tetley 2018
+// License: BSD 3 Clause
+
+module DocSoup.CharParsers
 
 open DocSoup.DocMonad
 

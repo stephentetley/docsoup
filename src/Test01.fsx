@@ -138,3 +138,10 @@ let test16 () =
 let test17 () = 
     let proc : DocParser<_> = findText "Site Name" >>= getRegionText
     runOnFileE proc testDoc |> printfn "%A"
+
+
+let temp01 () = 
+    let xs = ["1";"2";"3";"4"]
+    List.find (fun s -> s = "3") xs
+
+

@@ -58,9 +58,11 @@
     <Compile Include="DocSoup\Base.fs" />
     <Compile Include="DocSoup\DocMonad.fs" />
     <Compile Include="DocSoup\CharParsers.fs" />
+    <Compile Include="DocSoup\Monad2.fs" />
     <None Include="OldTest.fsx" />
     <None Include="OldTestRange.fsx" />
     <None Include="Test01.fsx" />
+    <None Include="Test02.fsx" />
     <Content Include="packages.config" />
     <COMReference Include="Microsoft Office 16.0 Object Library">
       <Guid>{2df8d04c-5bfa-101b-bde5-00aa0044de52}</Guid>
@@ -80,12 +82,16 @@
     </COMReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="mscorlib" />
-    <Reference Include="FSharp.Core">
-      <Name>FSharp.Core</Name>
-      <AssemblyName>FSharp.Core.dll</AssemblyName>
-      <HintPath>$(MSBuildProgramFiles32)\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\$(TargetFSharpCoreVersion)\FSharp.Core.dll</HintPath>
+    <Reference Include="FParsec">
+      <HintPath>..\packages\FParsec.1.0.3\lib\net40-client\FParsec.dll</HintPath>
     </Reference>
+    <Reference Include="FParsecCS">
+      <HintPath>..\packages\FParsec.1.0.3\lib\net40-client\FParsecCS.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharp.Core">
+      <HintPath>..\packages\FSharp.Core.4.0.0.1\lib\net40\FSharp.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />

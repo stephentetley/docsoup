@@ -1,4 +1,6 @@
-﻿
+﻿// Copyright (c) Stephen Tetley 2018
+// License: BSD 3 Clause
+
 module DocSoup.DocMonad
 
 open System.Text.RegularExpressions
@@ -70,12 +72,12 @@ let inline pzero () : DocParser<'a> =
     DocParser <| fun _ _ _ -> Err "fail-pzero"
 
 type DocParserBuilder() = 
-    member self.Return x        = preturn x
-    member self.Bind (p,f)      = bindM p f
-    member self.Zero ()         = pzero ()
-    member self.For xs ma       = forExprM xs ma
-    member self.Combine ma mb   = combineM ma mb
-    member self.Delay fn        = delayM fn
+    member self.Return x            = preturn x
+    member self.Bind (p,f)          = bindM p f
+    member self.Zero ()             = pzero ()
+    member self.For (xs,ma)         = forExprM xs ma
+    member self.Combine (ma,mb)     = combineM ma mb
+    member self.Delay fn            = delayM fn
 
  // Prefer "parse" to "parser" for the _Builder instance
 
