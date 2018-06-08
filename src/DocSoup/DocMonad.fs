@@ -189,6 +189,38 @@ let mapM (p: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b list> =
 let forM (source:'a list) (p: 'a -> DocSoup<'b>) : DocSoup<'b list> = mapM p source
 
 
+// Design note - no ``findM`` function
+// val findM : test: 'a -> DocSoup<bool> -> source:'a list -> DocSoup<'a>  
+// The name "findM" does not tell enough about the function - the crux is
+// should Err be an error or re-interpreted as false.
+
+
+
+/// A version of findM that finds the first success
+/// This allows type changing.
+let findSuccessM  (action: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b> = 
+    DocSoup <| fun doc focus -> 
+        let rec work ys = 
+            match ys with
+            | [] -> Err "findSuccessM - not found"
+            | z :: zs -> 
+                match apply1 (action z) doc focus with
+                | Err _ -> work zs
+                | Ok ans -> Ok ans
+        work source
+
+let findSuccessesM  (action: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b list> = 
+    DocSoup <| fun doc focus -> 
+        let rec work ac ys = 
+            match ys with
+            | [] -> Ok <| List.rev ac
+            | z :: zs -> 
+                match apply1 (action z) doc focus with
+                | Err _ -> work ac zs
+                | Ok ans -> work (ans::ac) zs
+        work [] source
+
+    
 let optionToAction (source:option<'a>) (errMsg:string) : DocSoup<'a> = 
     DocSoup <| fun _ _ -> 
         match source with
@@ -207,6 +239,15 @@ let optionalz (ma:DocSoup<'a>) : DocSoup<unit> =
         match apply1 ma doc focus with
         | Err _ -> Ok ()
         | Ok _ -> Ok ()
+
+/// Turn an operation into a boolean, when the action is success return true 
+/// when it fails return false
+let boolify (ma:DocSoup<'a>) : DocSoup<bool> = 
+    DocSoup <| fun doc focus ->
+        match apply1 ma doc focus with
+        | Err _ -> Ok false
+        | Ok _ -> Ok true
+
 
 type FallBackResult<'a> = 
     | ParseOk of 'a
@@ -388,6 +429,11 @@ let getTableArea(tid:TableAnchor) : DocSoup<Region> =
     | _ -> throwError 
             (sprintf "getTable - index out of range ix:%i [tables: %i]" index arr.Length)
 
+let tryContainingTable (needle:Region) : DocSoup<TableAnchor option> = 
+    tableAreas >>>= fun arr -> 
+    match Array.tryFindIndex (fun rgn -> isSubregionOf rgn needle) arr with
+    | Some ix -> sreturn (Some <| TableAnchor ix)
+    | None -> sreturn None
 
 
 let containingTable (needle:Region) : DocSoup<TableAnchor> = 
@@ -414,9 +460,6 @@ let containingCell (needle:Region) : DocSoup<CellAnchor> =
     match work 0 (Array.toList arr) with
     | Some cid -> sreturn cid
     | None -> throwError "containingCell"
-
-let parentTable (cell:CellAnchor) : DocSoup<TableAnchor> = 
-    sreturn cell.TableIndex
 
 let private getTable (anchor:TableAnchor) : DocSoup<Word.Table> = 
     getTablesInFocus >>>= fun arr -> 
@@ -447,35 +490,38 @@ let focusCell (anchor:CellAnchor) (ma:DocSoup<'a>) : DocSoup<'a> =
 
 
 let findCell (search:string) (matchCase:bool) : DocSoup<CellAnchor> =
-    findText search matchCase >>>= containingCell
+    findTextMany search matchCase >>>= findSuccessM containingCell
 
 let findCellPattern (search:string) : DocSoup<CellAnchor> =
-    findPattern search >>>= containingCell
+    findPatternMany search >>>= findSuccessM containingCell
 
 let findCells (search:string) (matchCase:bool) : DocSoup<CellAnchor list> =
-    findTextMany search matchCase >>>= fun regions -> 
-    mapM containingCell regions
+    findTextMany search matchCase >>>= findSuccessesM containingCell
 
 
 let findCellsPattern (search:string) : DocSoup<CellAnchor list> =
-    findPatternMany search >>>= fun regions -> 
-    mapM containingCell regions
+    findPatternMany search >>>= findSuccessesM containingCell
 
 
+
+/// Finds first table containing search text.
+/// If a match is found in "water" before a table, we continue the search.
 let findTable (search:string) (matchCase:bool) : DocSoup<TableAnchor> =
-    findText search matchCase >>>= containingTable
+    findTextMany search matchCase >>>= findSuccessM containingTable
 
+/// Finds first table containing a match.
+/// If a match is found in "water" before a table, we continue the search.
 let findTablePattern (search:string) : DocSoup<TableAnchor> =
-    findPattern search >>>= containingTable
+    findPatternMany search >>>= findSuccessM containingTable
+
+
     
 let findTables (search:string) (matchCase:bool) : DocSoup<TableAnchor list> =
-    findTextMany search matchCase >>>= fun regions -> 
-    mapM containingTable regions
+    findTextMany search matchCase >>>= findSuccessesM containingTable
 
 
 let findTablesPattern (search:string) : DocSoup<TableAnchor list> =
-    findPatternMany search >>>= fun regions -> 
-    mapM containingTable regions
+    findPatternMany search >>>= findSuccessesM containingTable
 
 
 let findTableAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor> =
@@ -542,3 +588,40 @@ let findTablesPatternAll (searches:string list) : DocSoup<TableAnchor list> =
     | (s :: ss) -> 
         findTablesPattern s >>>= fun tables -> 
         work ss [] tables
+
+let assertInFocus (region:Region) : DocSoup<unit> = 
+    DocSoup <| fun doc focus -> 
+        if isSubregionOf focus region then
+            Ok ()
+        else
+            Err "assertInFocus - outside focus"
+
+let assertCellInFocus (anchor:CellAnchor) : DocSoup<unit> = 
+    getCell anchor >>>= fun cell -> 
+    assertInFocus (extractRegion cell.Range)
+ 
+let assertTableInFocus (anchor:TableAnchor) : DocSoup<unit> = 
+    getTable anchor >>>= fun table -> 
+    assertInFocus (extractRegion table.Range)   
+
+
+let parentTable (cell:CellAnchor) : DocSoup<TableAnchor> = 
+    sreturn cell.TableIndex
+
+let cellLeft (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with RowIndex = cell.RowIndex - 1} 
+    assertCellInFocus c1 >>>. sreturn c1
+
+
+let cellRight (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with RowIndex = cell.RowIndex + 1} 
+    assertCellInFocus c1 >>>. sreturn c1
+
+let cellBelow (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with ColumnIndex = cell.ColumnIndex + 1} 
+    assertCellInFocus c1 >>>. sreturn c1
+
+let cellAbove (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with ColumnIndex = cell.ColumnIndex - 1} 
+    assertCellInFocus c1 >>>. sreturn c1
+

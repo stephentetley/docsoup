@@ -106,3 +106,19 @@ let test14 () =
         findTablesPatternAll ["C??mber Measurements"; "C??mber Name"]
     runOnFileE proc testDoc |> Seq.iter (printfn "%A")
 
+// In the sample doc the first occurence of "Scope of Works" is not in a table
+
+let test15 () =
+    let proc : DocSoup<_> = 
+        findTable "Scope of Works" true 
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test16 () =
+    let proc : DocSoup<_> = 
+        findTablesAll ["Scope of Works"] true 
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+let test17 () =
+    let proc : DocSoup<_> = 
+        findCell "Scope of Works" true 
+    runOnFileE proc testDoc |> printfn "%A"

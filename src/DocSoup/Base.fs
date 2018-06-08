@@ -38,8 +38,8 @@ let getRange (region:Region) (doc:Word.Document) : Word.Range =
 
 // Use (Single Case) Struct Unions to get the same things as Haskell Newtypes.
 
-let isSubregionOf (major:Region) (minor:Region) : bool = 
-    minor.RegionStart >= major.RegionStart && minor.RegionEnd <= major.RegionEnd
+let isSubregionOf (haystack:Region) (needle:Region) : bool = 
+    needle.RegionStart >= haystack.RegionStart && needle.RegionEnd <= haystack.RegionEnd
 
 let regionText (focus:Region) (doc:Word.Document) : string = 
     let range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
