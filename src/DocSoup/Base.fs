@@ -38,9 +38,6 @@ let getRange (region:Region) (doc:Word.Document) : Word.Range =
 
 // Use (Single Case) Struct Unions to get the same things as Haskell Newtypes.
 
-
-
-
 let isSubregionOf (major:Region) (minor:Region) : bool = 
     minor.RegionStart >= major.RegionStart && minor.RegionEnd <= major.RegionEnd
 
@@ -48,7 +45,17 @@ let regionText (focus:Region) (doc:Word.Document) : string =
     let range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
     Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
 
+let regionPlus (r1:Region) (r2:Region) : Region = 
+    { RegionStart = min r1.RegionStart r2.RegionStart
+      RegionEnd = max r1.RegionEnd r2.RegionEnd }
 
+let regionConcat (regions:Region list) : Region option = 
+    match regions with
+    | [] -> None
+    | (r::rs) -> Some <| List.fold regionPlus r rs
+
+
+// cells
 let internal softCell (table:Word.Table) (row:int) (col:int) : option<Word.Cell> = 
     try 
         Some <| table.Cell(row, col)
@@ -78,7 +85,8 @@ let tryFindCell (predicate:Word.Cell -> bool) (table:Word.Table) : option<Word.C
 
 [<Struct>]
 type TableAnchor = TableAnchor of int
-let internal getTableId (tid:TableAnchor) : int = match tid with | TableAnchor ix -> ix
+let internal getTableIndex (anchor:TableAnchor) : int = 
+    match anchor with | TableAnchor ix -> ix
 
 type CellAnchor = 
     { TableIndex: TableAnchor

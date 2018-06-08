@@ -175,7 +175,7 @@ let (.>>>) (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'a> = seqL ma mb
 let (>>>.) (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'b> = seqR ma mb
 
 
-let mapM (source:'a list) (p: 'a -> DocSoup<'b>) : DocSoup<'b list> = 
+let mapM (p: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b list> = 
     DocSoup <| fun doc focus -> 
         let rec work ac ys = 
             match ys with
@@ -186,6 +186,14 @@ let mapM (source:'a list) (p: 'a -> DocSoup<'b>) : DocSoup<'b list> =
                 | Ok ans -> work (ans::ac) zs
         work [] source
 
+let forM (source:'a list) (p: 'a -> DocSoup<'b>) : DocSoup<'b list> = mapM p source
+
+
+let optionToAction (source:option<'a>) (errMsg:string) : DocSoup<'a> = 
+    DocSoup <| fun _ _ -> 
+        match source with
+        | None -> Err errMsg
+        | Some a -> Ok a
 
 let optional (ma:DocSoup<'a>) : DocSoup<'a option> = 
     DocSoup <| fun doc focus ->
@@ -330,6 +338,16 @@ let findPatternMany (search:string) : DocSoup<Region list> =
         range1.Find.ClearFormatting ()
         work range1 []
 
+/// If successful returns the concatenation of all regions.
+let findAll (searches:string list) (matchCase:bool) : DocSoup<Region> =
+    mapM (fun s -> findText s matchCase) searches >>>= fun xs ->
+    optionToAction (regionConcat xs) "findAll - fail" 
+
+/// If successful returns the concatenation of all regions.
+let findPatternAll (searches:string list) : DocSoup<Region> =
+    mapM findPattern searches >>>= fun xs ->
+    optionToAction (regionConcat xs) "findAllPattern - fail" 
+
 
 let private getTablesInFocus : DocSoup<Word.Table []> = 
     DocSoup <| fun doc focus -> 
@@ -362,7 +380,7 @@ let tableAreas : DocSoup<Region []> =
 /// Note - the results are indexed within the current focus.
 /// Note - this is zero indexed (unlike Word's automation API)
 let getTableArea(tid:TableAnchor) : DocSoup<Region> = 
-    let index = getTableId tid
+    let index = getTableIndex tid
     tableAreas >>>= fun arr -> 
     try 
         sreturn arr.[index]
@@ -396,4 +414,131 @@ let containingCell (needle:Region) : DocSoup<CellAnchor> =
     match work 0 (Array.toList arr) with
     | Some cid -> sreturn cid
     | None -> throwError "containingCell"
+
+let parentTable (cell:CellAnchor) : DocSoup<TableAnchor> = 
+    sreturn cell.TableIndex
+
+let private getTable (anchor:TableAnchor) : DocSoup<Word.Table> = 
+    getTablesInFocus >>>= fun arr -> 
+    try
+        let ix = getTableIndex anchor
+        sreturn arr.[ix]
+    with
+    | _ -> throwError "getTable error (index out-of-range?)"
+
+let private getCell (anchor:CellAnchor) : DocSoup<Word.Cell> = 
+    getTable (anchor.TableIndex) >>>= fun table ->
+    try
+        sreturn <| table.Cell(anchor.RowIndex, anchor.ColumnIndex)
+    with
+    | _ -> throwError "getCell error (index out-of-range?)"
+
+
+let focusTable (anchor:TableAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    getTable anchor >>>= fun table ->
+    let region = extractRegion table.Range 
+    focus region ma
+
+
+let focusCell (anchor:CellAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    getCell anchor >>>= fun cell ->
+    let region = extractRegion cell.Range 
+    focus region ma
+
+
+let findCell (search:string) (matchCase:bool) : DocSoup<CellAnchor> =
+    findText search matchCase >>>= containingCell
+
+let findCellPattern (search:string) : DocSoup<CellAnchor> =
+    findPattern search >>>= containingCell
+
+let findCells (search:string) (matchCase:bool) : DocSoup<CellAnchor list> =
+    findTextMany search matchCase >>>= fun regions -> 
+    mapM containingCell regions
+
+
+let findCellsPattern (search:string) : DocSoup<CellAnchor list> =
+    findPatternMany search >>>= fun regions -> 
+    mapM containingCell regions
+
+
+let findTable (search:string) (matchCase:bool) : DocSoup<TableAnchor> =
+    findText search matchCase >>>= containingTable
+
+let findTablePattern (search:string) : DocSoup<TableAnchor> =
+    findPattern search >>>= containingTable
     
+let findTables (search:string) (matchCase:bool) : DocSoup<TableAnchor list> =
+    findTextMany search matchCase >>>= fun regions -> 
+    mapM containingTable regions
+
+
+let findTablesPattern (search:string) : DocSoup<TableAnchor list> =
+    findPatternMany search >>>= fun regions -> 
+    mapM containingTable regions
+
+
+let findTableAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor> =
+    let rec work (ss:string list) (anchors: TableAnchor list) = 
+        match anchors with
+        | [] -> throwError "findTableAll not found" 
+        | (a1 :: rest) -> 
+            focusTable a1 (optional (findAll ss matchCase)) >>>= fun ans ->
+            match ans with
+            | Some _ -> sreturn a1
+            | None -> work ss rest
+    match searches with
+    | [] -> throwError "findTableAll empty search list"
+    | [s] -> findTable s matchCase
+    | (s :: ss) -> 
+        findTables s matchCase >>>= fun tables -> 
+        work ss tables
+
+
+let findTablesAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor list> =
+    let rec work (ss:string list) (ac: TableAnchor list) (anchors: TableAnchor list)  = 
+        match anchors with
+        | [] -> sreturn (List.rev ac)
+        | (a1 :: rest) -> 
+            focusTable a1 (optional (findAll ss matchCase)) >>>= fun ans ->
+            match ans with
+            | Some _ -> work ss (a1::ac) rest
+            | None -> work ss ac rest
+    match searches with
+    | [] -> throwError "findTablesAll - empty search list"
+    | [s] -> findTables s matchCase
+    | (s :: ss) -> 
+        findTables s matchCase >>>= fun tables -> 
+        work ss [] tables
+
+let findTablePatternAll (searches:string list) : DocSoup<TableAnchor> =
+    let rec work (ss:string list) (anchors: TableAnchor list) = 
+        match anchors with
+        | [] -> throwError "findTablePatternAll not found" 
+        | (a1 :: rest) -> 
+            focusTable a1 (optional (findPatternAll ss)) >>>= fun ans ->
+            match ans with
+            | Some _ -> sreturn a1
+            | None -> work ss rest
+    match searches with
+    | [] -> throwError "findTablePatternAll empty search list"
+    | [s] -> findTablePattern s
+    | (s :: ss) -> 
+        findTablesPattern s  >>>= fun tables -> 
+        work ss tables
+
+let findTablesPatternAll (searches:string list) : DocSoup<TableAnchor list> =
+    let rec work (ss:string list) (ac: TableAnchor list) (anchors: TableAnchor list)  = 
+        match anchors with
+        | [] -> sreturn (List.rev ac)
+        | (a1 :: rest) -> 
+            focusTable a1 (optional (findPatternAll ss)) >>>= fun ans ->
+            match ans with
+            | Some _ -> work ss (a1::ac) rest
+            | None -> work ss ac rest
+    match searches with
+    | [] -> throwError "findTablesAll - empty search list"
+    | [s] -> findTablesPattern s 
+    | (s :: ss) -> 
+        findTablesPattern s >>>= fun tables -> 
+        work ss [] tables

@@ -42,7 +42,7 @@ let test05 () =
 
 let test06 () = 
     let proc : DocSoup<_> = 
-        findPatternMany "D??charge" >>>= fun res -> mapM res (fun rgn -> focus rgn getText)
+        findPatternMany "D??charge" >>>= fun res -> forM res (fun rgn -> focus rgn getText)
     runOnFileE proc testDoc |> Seq.iter (printfn "%A")
 
 let temp01 (ix:int) = 
@@ -70,5 +70,39 @@ let test07b () =
 
 let test08 () = 
     let proc : DocSoup<_> = 
-        findText "SAI Number" true >>>= containingCell
+        findCell "SAI Number" true 
     runOnFileE proc testDoc |> printfn "%A"
+
+let test09 () = 
+    let proc : DocSoup<_> = 
+        findCells "discharge" false 
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+
+let test10 () = 
+    let proc : DocSoup<_> = 
+        findCellsPattern "D??charge"
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+
+let test11 () = 
+    let proc : DocSoup<_> = 
+        findTable "SAI Number" true 
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test12 () =
+    let proc : DocSoup<_> = 
+        findTableAll ["Survey Information"; "Company"; "Field Engineer"] true
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test13 () =
+    let proc : DocSoup<_> = 
+        findTablesAll ["Chamber Measurements"; "Chamber Name"] true
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+
+let test14 () =
+    let proc : DocSoup<_> = 
+        findTablesPatternAll ["C??mber Measurements"; "C??mber Name"]
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
