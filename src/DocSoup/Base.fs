@@ -33,8 +33,13 @@ let extractRegion (range:Word.Range) : Region = { RegionStart = range.Start; Reg
     
 let maxRegion (doc:Word.Document) : Region = extractRegion <| doc.Range()
 
-let getRange (region:Region)  (doc:Word.Document) : Word.Range = 
+let getRange (region:Region) (doc:Word.Document) : Word.Range = 
     doc.Range(rbox <| region.RegionStart, rbox <| region.RegionEnd - 1)
+
+// Use (Single Case) Struct Unions to get the same things as Haskell Newtypes.
+
+
+
 
 let isSubregionOf (major:Region) (minor:Region) : bool = 
     minor.RegionStart >= major.RegionStart && minor.RegionEnd <= major.RegionEnd
@@ -43,3 +48,39 @@ let regionText (focus:Region) (doc:Word.Document) : string =
     let range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
     Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
 
+
+let internal softCell (table:Word.Table) (row:int) (col:int) : option<Word.Cell> = 
+    try 
+        Some <| table.Cell(row, col)
+    with
+    | _ -> None
+
+let tryFindCell (predicate:Word.Cell -> bool) (table:Word.Table) : option<Word.Cell> = 
+    let rowMax = table.Rows.Count 
+    let colMax = table.Columns.Count
+
+    let rec work (row:int) (col:int) : option<Word.Cell> = 
+        if row >= rowMax then 
+            None
+        else
+            if col >= colMax then 
+                work (row+1) 0 
+            else
+                match softCell table row col with
+                | None -> work row (col+1)
+                | Some cell ->
+                    if predicate cell then
+                        Some cell
+                    else work row (col+1)
+    work 0 0                 
+
+
+
+[<Struct>]
+type TableAnchor = TableAnchor of int
+let internal getTableId (tid:TableAnchor) : int = match tid with | TableAnchor ix -> ix
+
+type CellAnchor = 
+    { TableIndex: TableAnchor
+      RowIndex: int
+      ColumnIndex: int }

@@ -9,6 +9,7 @@ open Microsoft.Office.Interop
 
 #load @"DocSoup\Base.fs"
 #load @"DocSoup\Monad2.fs"
+open DocSoup.Base
 open DocSoup.Monad2
 
 // Open Fparsec last
@@ -32,7 +33,7 @@ let test03 () =
     runOnFileE proc testDoc |> List.iter (printfn "%A")
 
 let test04 () = 
-    let proc : DocSoup<_> = tables
+    let proc : DocSoup<_> = tableAreas
     runOnFileE proc testDoc |> Seq.iter (printfn "%A")
 
 let test05 () = 
@@ -45,5 +46,29 @@ let test06 () =
     runOnFileE proc testDoc |> Seq.iter (printfn "%A")
 
 let temp01 (ix:int) = 
-    let proc : DocSoup<_> = getTable ix
+    let proc : DocSoup<_> = getTableArea (TableId ix)
+    runOnFileE proc testDoc |> printfn "%A"
+
+
+let test07 () = 
+    let proc : DocSoup<_> = 
+        findText "SAI Number" true >>>= containingTable >>>=  getTableArea >>>= fun rgn -> focus rgn getText
+    runOnFileE proc testDoc |> printfn "%s"
+
+
+// there is an occurence of "Site Details" prior to the "Site Details" table.
+let test07a () = 
+    let proc : DocSoup<_> = 
+        findText "Site Details" true
+    runOnFileE proc testDoc |> printfn "%A"
+
+
+let test07b () = 
+    let proc : DocSoup<_> = 
+        findText "SAI Number" true
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test08 () = 
+    let proc : DocSoup<_> = 
+        findText "SAI Number" true >>>= containingCell
     runOnFileE proc testDoc |> printfn "%A"

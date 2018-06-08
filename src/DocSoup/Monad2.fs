@@ -281,12 +281,14 @@ let findText (search:string) (matchCase:bool) : DocSoup<Region> =
         else
             Err <| sprintf "findText - '%s' not found" search
 
+/// Case sensitivity always appears to be true for Wildcard matches.
 let findPattern (search:string) : DocSoup<Region> =
     DocSoup <| fun doc focus  -> 
         let range1 = getRange focus doc
         range1.Find.ClearFormatting ()
         if range1.Find.Execute (FindText = rbox search, 
                                 MatchWildcards = rbox true,
+                                MatchCase = rbox true,
                                 Forward = rbox true) then
             Ok <| extractRegion range1
         else
@@ -309,10 +311,13 @@ let findTextMany (search:string) (matchCase:bool) : DocSoup<Region list> =
         range1.Find.ClearFormatting ()
         work range1 []
 
+
+/// Case sensitivity always appears to be true for Wildcard matches.
 let findPatternMany (search:string) : DocSoup<Region list> =
     let rec work (rng:Word.Range) (ac: Region list) : Result<Region list> = 
         rng.Find.Execute (FindText = rbox search, 
                             MatchWildcards = rbox true,
+                            MatchCase = rbox true,
                             Forward = rbox true) |> ignore
         if rng.Find.Found then
             let region = extractRegion rng
@@ -326,25 +331,69 @@ let findPatternMany (search:string) : DocSoup<Region list> =
         work range1 []
 
 
-/// Note - the results will be within the current focus!
-let tables : DocSoup<Region []> = 
+let private getTablesInFocus : DocSoup<Word.Table []> = 
     DocSoup <| fun doc focus -> 
-        let range0:Word.Range = doc.Range()
-        let allTables:Word.Table list = (range0.Tables |> Seq.cast<Word.Table> |> Seq.toList)
-        let allRegions = List.map (fun (tbl:Word.Table) -> tbl.Range |> extractRegion) allTables
-        let ans = List.filter (isSubregionOf focus) allRegions |> List.toArray
-        Ok <| ans
+        try 
+            let rec work (ac:Word.Table list) (source:Word.Table list) = 
+                match source with
+                | [] -> List.rev ac |> List.toArray
+                | (t :: ts) -> 
+                    let tregion = t.Range |> extractRegion
+                    if isSubregionOf focus tregion then 
+                        work (t::ac) ts
+                    else
+                        work ac ts
+            let wholeDoc:Word.Range = doc.Range()
+            let allTables : Word.Table list = 
+                doc.Range().Tables |> Seq.cast<Word.Table> |> Seq.toList
+            Ok <| work [] allTables
+        with
+        | _ -> Err "getTablesInFocus"
+
+
+/// Note - the results will be within the current focus!
+let tableAreas : DocSoup<Region []> = 
+    let extrRegions = Array.map (fun (table:Word.Table) -> table.Range |> extractRegion)
+    fmapM extrRegions getTablesInFocus
+    
+
 
 
 /// Note - the results are indexed within the current focus.
 /// Note - this is zero indexed (unlike Word's automation API)
-let getTable(index:int) : DocSoup<Region> = 
-    tables >>>= fun arr -> 
-    if index >= arr.Length || index < 0 then 
-        throwError 
-            (sprintf "getTable - index out of range ix:%i [tables: %i]" index arr.Length)
-    else 
+let getTableArea(tid:TableAnchor) : DocSoup<Region> = 
+    let index = getTableId tid
+    tableAreas >>>= fun arr -> 
+    try 
         sreturn arr.[index]
+    with
+    | _ -> throwError 
+            (sprintf "getTable - index out of range ix:%i [tables: %i]" index arr.Length)
 
 
 
+let containingTable (needle:Region) : DocSoup<TableAnchor> = 
+    tableAreas >>>= fun arr -> 
+    match Array.tryFindIndex (fun rgn -> isSubregionOf rgn needle) arr with
+    | Some ix -> sreturn (TableAnchor ix)
+    | None -> throwError "No containingTable found."
+
+
+let containingCell (needle:Region) : DocSoup<CellAnchor> = 
+    let rec work (tix:int) (tables:Word.Table list) : CellAnchor option = 
+        let test (cell:Word.Cell) : bool = 
+            isSubregionOf (extractRegion cell.Range) needle
+        match tables with
+        | [] -> None
+        | (t :: ts) -> 
+            match tryFindCell test t with
+            | Some cell -> Some { TableIndex = TableAnchor tix;
+                                    RowIndex = cell.RowIndex;
+                                    ColumnIndex = cell.ColumnIndex }
+            | None -> work (tix+1) ts
+
+    getTablesInFocus >>>= fun arr -> 
+    match work 0 (Array.toList arr) with
+    | Some cid -> sreturn cid
+    | None -> throwError "containingCell"
+    
