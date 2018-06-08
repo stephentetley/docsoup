@@ -1,9 +1,9 @@
 ﻿// Copyright (c) Stephen Tetley 2018
 // License: BSD 3 Clause
 
-module DocSoup.CharParsers
+module Old.CharParsers
 
-open DocSoup.DocMonad
+open Old.DocMonad
 
 // We need the regular parser combinators for data extraction, e.g. int, 
 // float, digit, letter, etc.

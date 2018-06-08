@@ -2,146 +2,73 @@
 #r "Microsoft.Office.Interop.Word"
 open Microsoft.Office.Interop
 
+#I @"..\packages\FParsec.1.0.3\lib\portable-net45+win8+wp8+wpa81"
+#r "FParsec"
+#r "FParsecCS"
+
+
 #load @"DocSoup\Base.fs"
 #load @"DocSoup\DocMonad.fs"
-#load @"DocSoup\CharParsers.fs"
 open DocSoup.Base
 open DocSoup.DocMonad
-open DocSoup.CharParsers
 
-// Note to self, this test doc is not "well formed". 
-// Textual table data is often not split into rows and columns.
+// Open Fparsec last
+open FParsec
+
+
 let testDoc = @"G:\work\working\Survey1.docx"
 
-
-let showTable (t1 : Word.Table) = 
-    printfn "Rows %i, Columns %i" t1.Rows.Count t1.Columns.Count
-    let ans = t1.ConvertToText (rbox Word.WdSeparatorType.wdSeparatorHyphen)
-    printfn "Table: %s" ans.Text
-
-let shorten (s:string) = if s.Length > 10 then s.[0..9]+"..." else s
-
 let test01 () = 
-    let proc : DocParser<unit> = 
-        docParse { 
-            do! fmapM (printfn "Sections: %i")      countSections
-            do! fmapM (printfn "Paragraphs: %i")    countParagraphs
-            do! fmapM (printfn "Tables: %i")        countTables
-        }
-    runOnFileE proc testDoc
-
-
-let test02 () = 
-    let proc (doc:Word.Document) : unit = 
-        doc.Tables 
-            |> Seq.cast<Word.Table> 
-            |> Seq.iter showTable
-        doc.Sections 
-            |> Seq.cast<Word.Section> 
-            |> Seq.iter (fun s1 -> printfn "Tables: %i" s1.Range.Tables.Count)
-
-        let all : Word.Range = doc.Content
-        all.Select()
-        printfn "Characters: %i" all.Characters.Count
-    runOnFileE (liftGlobalOperation proc) testDoc
-
-let test03 () = 
-    let proc (doc:Word.Document) : unit = 
-        let t1 = doc.Tables.[1]
-        printfn "Rows %i, Columns %i" t1.Rows.Count t1.Columns.Count
-        printfn "%s" (t1.ConvertToText(rbox Word.WdSeparatorType.wdSeparatorHyphen).Text)
-    runOnFileE (liftGlobalOperation proc) testDoc
-
-let test04 () = 
-    let proc (doc:Word.Document) : unit = 
-        let t1 = doc.Tables.[1]
-        let mutable rng1 = t1.Range
-        // The mutated range matches what is found.
-        let found = rng1.Find.Execute(FindText = rbox "Process Application")
-        if found then
-            printfn "'%s'" rng1.Text
-        else printfn "no found"
-    runOnFileE (liftGlobalOperation proc) testDoc
-
-
-
-
-
-let test05 () = 
-    let proc = tupleM2 countTables countSections
-    printfn "%A" <| runOnFileE proc testDoc
-
-// All text of the document
-let test06 () = 
-    printfn "%A" <| runOnFileE cleanText testDoc
-
-// This is nice and high level...
-let test07 () = 
-    let proc = 
-        sequenceM   [ table 1 <| cell (0,0) cleanText
-                    ; table 3 <| cell (0,0) cleanText
-                    ; table 3 <| cell (1,0) cleanText
-                    ; table 3 <| cell (2,0) cleanText
-                    ; table 3 <| cell (3,0) cleanText
-                    ; table 3 <| cell (4,0) cleanText
-                    ; table 3 <| cell (5,0) cleanText
-                    ; table 3 << cell (6,0) <| cleanText
-                    ]
-   
-    printfn "%A" <| runOnFileE proc testDoc
-
-
-let test08 () = 
-    let proc = docParse { 
-        let! i = countTables
-        let! xs = mapTablesWith (fmapM shorten cleanText)
-        return (i,xs)
-    }
-    printfn "%A" <| runOnFileE proc testDoc
-
-let test09 () = 
-    let proc = docParse { 
-        let! (i,xs) = table 3 <| tupleM2 (countCells) (mapCellsWith (fmapM shorten cleanText))
-        return (i,xs)
-    }
-    printfn "%A" <| runOnFileE proc testDoc
-
-let test10 () = 
-    let proc : DocParser<_> = spaces1 >>. pstringCI "EVENT"
-    runOnFileE proc testDoc |> printfn "%A"
-
-let test11 () = 
-    let proc : DocParser<_> = anyString 6
-    runOnFileE proc testDoc |> printfn "%A"
-
-let test12 () = 
-    let proc : DocParser<_> = spaces1 >>. manyTill letter spaces1
-    runOnFileE proc testDoc |> printfn "%A"
-
-let test13 () = 
-    let proc : DocParser<_> = spaces1 >>. many1Till letter spaces1
-    runOnFileE proc testDoc |> printfn "%A"
-
-let test14 () = 
-    let proc : DocParser<_> = spaces1 >>. restOfLine true
+    let parser1:TextParser<string> = 
+        spaces1 >>. many1Till letter spaces1 |>> System.String.Concat
+    let proc : DocSoup<_> = fparse parser1 |>>> id
     runOnFileE proc testDoc |> printfn "%s"
 
-let test15 () = 
-    let proc : DocParser<_> = between spaces1 spaces1 (restOfLine false)
+let test02 () = 
+    let proc : DocSoup<_> = findText "Discharge" true
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test03 () = 
+    let proc : DocSoup<_> = findTextMany "Discharge" true
+    runOnFileE proc testDoc |> List.iter (printfn "%A")
+
+let test04 () = 
+    let proc : DocSoup<_> = tableAreas
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+let test05 () = 
+    let proc : DocSoup<_> = findPattern "D??charge"
+    runOnFileE proc testDoc |> printfn "%A"
+
+let test06 () = 
+    let proc : DocSoup<_> = 
+        findPatternMany "D??charge" >>>= fun res -> mapM res (fun rgn -> focus rgn getText)
+    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+
+let temp01 (ix:int) = 
+    let proc : DocSoup<_> = getTableArea (TableAnchor ix)
     runOnFileE proc testDoc |> printfn "%A"
 
 
-let test16 () = 
-    let proc : DocParser<_> = findText "Site Name"
+let test07 () = 
+    let proc : DocSoup<_> = 
+        findText "SAI Number" true >>>= containingTable >>>=  getTableArea >>>= fun rgn -> focus rgn getText
+    runOnFileE proc testDoc |> printfn "%s"
+
+
+// there is an occurence of "Site Details" prior to the "Site Details" table.
+let test07a () = 
+    let proc : DocSoup<_> = 
+        findText "Site Details" true
     runOnFileE proc testDoc |> printfn "%A"
 
-let test17 () = 
-    let proc : DocParser<_> = findText "Site Name" >>= getRegionText
+
+let test07b () = 
+    let proc : DocSoup<_> = 
+        findText "SAI Number" true
     runOnFileE proc testDoc |> printfn "%A"
 
-
-let temp01 () = 
-    let xs = ["1";"2";"3";"4"]
-    List.find (fun s -> s = "3") xs
-
-
+let test08 () = 
+    let proc : DocSoup<_> = 
+        findText "SAI Number" true >>>= containingCell
+    runOnFileE proc testDoc |> printfn "%A"

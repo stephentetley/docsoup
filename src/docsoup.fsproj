@@ -52,17 +52,17 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="DocSoup\Base.fs" />
+    <Compile Include="DocSoup\DocMonad.fs" />
     <Compile Include="Old\Extractors.fs" />
     <Compile Include="Old\RangeOperations.fs" />
     <Compile Include="Old\Regions.fs" />
-    <Compile Include="DocSoup\Base.fs" />
-    <Compile Include="DocSoup\DocMonad.fs" />
-    <Compile Include="DocSoup\CharParsers.fs" />
-    <Compile Include="DocSoup\Monad2.fs" />
+    <Compile Include="Old\DocMonad.fs" />
+    <Compile Include="Old\CharParsers.fs" />
     <None Include="OldTest.fsx" />
     <None Include="OldTestRange.fsx" />
+    <None Include="OldTest01.fsx" />
     <None Include="Test01.fsx" />
-    <None Include="Test02.fsx" />
     <Content Include="packages.config" />
     <COMReference Include="Microsoft Office 16.0 Object Library">
       <Guid>{2df8d04c-5bfa-101b-bde5-00aa0044de52}</Guid>

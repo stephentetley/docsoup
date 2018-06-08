@@ -3,120 +3,107 @@
 
 module DocSoup.DocMonad
 
-open System.Text.RegularExpressions
 open Microsoft.Office.Interop
+open FParsec
 
 open DocSoup.Base
 
 
-[<Struct>]
-type State = State of string
+type TextParser<'a> = Parser<'a, unit>
 
-type Ans<'a> = 
+type Result<'a> = 
     | Err of string
-    | Ok of State * 'a
-
-let private ansMapM (fn:'a -> State -> Ans<'b>) (st0:State) (xs:'a list) : Ans<'b list> = 
-    let rec work ac st ys = 
-        match ys with
-        | [] -> Ok(st, List.rev ac)
-        | z :: zs -> 
-            match fn z st with
-            | Err msg -> Err msg
-            | Ok(st1,a) -> work (a::ac) st1 zs
-    work [] st0 xs
+    | Ok of 'a
 
 
-// DocParser is Reader(immutable)+Reader+State+Error
-// WARNING - region and state represent the same thing - must be kept in sync
-type DocParser<'a> = DocParser of (Word.Document -> Region -> State -> Ans<'a>)
+let private execFParsec (doc:Word.Document) (region:Region) (p:TextParser<'a>) : Result<'a> = 
+    let text = regionText region doc
+    let name = doc.Name  
+    match runParserOnString p () name text with
+    | Success(ans,_,_) -> Ok ans
+    | Failure(msg,_,_) -> Err msg
 
 
-let inline apply1 (ma : DocParser<'a>) (doc:Word.Document) (focus:Region) (st:State) : Ans<'a>= 
-    let (DocParser f) = ma in f doc focus st
-
-let inline preturn (x:'a) : DocParser<'a> = DocParser <| fun _ _ st -> Ok(st,x)
+// DocSoup is Reader(immutable)+Reader+Error
+type DocSoup<'a> = DocSoup of (Word.Document -> Region -> Result<'a>)
 
 
-let inline bindM (ma:DocParser<'a>) (f : 'a -> DocParser<'b>) : DocParser<'b> =
-    DocParser <| fun doc focus st0 -> 
-        match apply1 ma doc focus st0 with
+let inline private apply1 (ma : DocSoup<'a>) (doc:Word.Document) (focus:Region) : Result<'a>= 
+    let (DocSoup f) = ma in f doc focus
+
+let inline sreturn (x:'a) : DocSoup<'a> = DocSoup <| fun _ _ -> Ok x
+
+
+let inline private bindM (ma:DocSoup<'a>) (f : 'a -> DocSoup<'b>) : DocSoup<'b> =
+    DocSoup <| fun doc focus -> 
+        match apply1 ma doc focus with
         | Err msg -> Err msg
-        | Ok(st1,a) -> apply1 (f a) doc focus st1
+        | Ok a -> apply1 (f a) doc focus
 
-let forExprM (source: seq<'a>) (fn: 'a -> DocParser<unit>) : DocParser<unit> = 
-    DocParser <| fun doc focus st0 -> 
-        let rec work st ys = 
-            match ys with
-            | [] -> Ok (st, ())
-            | z :: zs -> 
-                match apply1 (fn z) doc focus st with
-                | Err msg -> Err msg
-                | Ok (st1,a) -> work st1 zs
-        work st0 (Seq.toList source)
+let inline szero () : DocSoup<'a> = 
+    DocSoup <| fun _ _ -> Err "szero"
 
-let combineM (ma:DocParser<unit>) (mb:DocParser<unit>) : DocParser<unit> = 
-    DocParser <| fun doc focus st0 -> 
-        match apply1 ma doc focus st0 with
+
+let inline private combineM (ma:DocSoup<unit>) (mb:DocSoup<unit>) : DocSoup<unit> = 
+    DocSoup <| fun doc focus -> 
+        match apply1 ma doc focus with
         | Err msg -> Err msg
-        | Ok(st1,a) -> 
-            match apply1 mb doc focus st1 with
-            | Err msg -> Err msg
-            | Ok(st2,a) -> Ok (st2, ())
+        | Ok a -> apply1 mb doc focus
 
-let delayM (fn:unit -> DocParser<'a>) : DocParser<'a> = 
-    bindM (preturn ()) fn 
+let inline private  delayM (fn:unit -> DocSoup<'a>) : DocSoup<'a> = 
+    bindM (sreturn ()) fn 
 
 
-let inline pzero () : DocParser<'a> = 
-    DocParser <| fun _ _ _ -> Err "fail-pzero"
 
-type DocParserBuilder() = 
-    member self.Return x            = preturn x
+
+type DocSoupBuilder() = 
+    member self.Return x            = sreturn x
     member self.Bind (p,f)          = bindM p f
-    member self.Zero ()             = pzero ()
-    member self.For (xs,ma)         = forExprM xs ma
+    member self.Zero ()             = szero ()
+    // member self.For (xs,ma)         = forExprM xs ma
     member self.Combine (ma,mb)     = combineM ma mb
     member self.Delay fn            = delayM fn
 
  // Prefer "parse" to "parser" for the _Builder instance
 
-let (docParse:DocParserBuilder) = new DocParserBuilder()
+let (docSoup:DocSoupBuilder) = new DocSoupBuilder()
 
-let (>>=) (ma:DocParser<'a>) (fn:'a -> DocParser<'b>) : DocParser<'b> = bindM ma fn
+
+
+let (>>>=) (ma:DocSoup<'a>) (fn:'a -> DocSoup<'b>) : DocSoup<'b> = bindM ma fn
 
 
 // Common monadic operations
-let fmapM (fn:'a -> 'b) (ma:DocParser<'a>) : DocParser<'b> = 
-    DocParser <| fun doc focus st0 -> 
-       match apply1 ma doc focus st0 with
+let fmapM (fn:'a -> 'b) (ma:DocSoup<'a>) : DocSoup<'b> = 
+    DocSoup <| fun doc focus -> 
+       match apply1 ma doc focus with
        | Err msg -> Err msg
-       | Ok(st1,a)-> Ok (st1, fn a)
+       | Ok a-> Ok <| fn a
 
+// This is the nub of embedding FParsec - name clashes.
+// We avoid them by using longer names in DocSoup.
+let (|>>>) (ma:DocSoup<'a>) (fn:'a -> 'b) : DocSoup<'b> = fmapM fn ma
+let (<<<|) (fn:'a -> 'b) (ma:DocSoup<'a>) : DocSoup<'b> = fmapM fn ma
 
-let (|>>) (ma:DocParser<'a>) (fn:'a -> 'b) : DocParser<'b> = fmapM fn ma
-let (<<|) (fn:'a -> 'b) (ma:DocParser<'a>) : DocParser<'b> = fmapM fn ma
+let liftM (fn:'a -> 'x) (ma:DocSoup<'a>) : DocSoup<'x> = fmapM fn ma
 
-
-let liftM (fn:'a -> 'x) (ma:DocParser<'a>) : DocParser<'x> = fmapM fn ma
-
-let liftM2 (fn:'a -> 'b -> 'x) (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'x> = 
-    docParse { 
+let liftM2 (fn:'a -> 'b -> 'x) (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'x> = 
+    docSoup { 
         let! a = ma
         let! b = mb
         return (fn a b)
     }
 
-let liftM3 (fn:'a -> 'b -> 'c -> 'x) (ma:DocParser<'a>) (mb:DocParser<'b>) (mc:DocParser<'c>) : DocParser<'x> = 
-    docParse { 
+let liftM3 (fn:'a -> 'b -> 'c -> 'x) (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) : DocSoup<'x> = 
+    docSoup { 
         let! a = ma
         let! b = mb
         let! c = mc
         return (fn a b c)
     }
 
-let liftM4 (fn:'a -> 'b -> 'c -> 'd -> 'x) (ma:DocParser<'a>) (mb:DocParser<'b>) (mc:DocParser<'c>) (md:DocParser<'d>) : DocParser<'x> = 
-    docParse { 
+let liftM4 (fn:'a -> 'b -> 'c -> 'd -> 'x) (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) : DocSoup<'x> = 
+    docSoup { 
         let! a = ma
         let! b = mb
         let! c = mc
@@ -125,8 +112,8 @@ let liftM4 (fn:'a -> 'b -> 'c -> 'd -> 'x) (ma:DocParser<'a>) (mb:DocParser<'b>)
     }
 
 
-let liftM5 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'x) (ma:DocParser<'a>) (mb:DocParser<'b>) (mc:DocParser<'c>) (md:DocParser<'d>) (me:DocParser<'e>) : DocParser<'x> = 
-    docParse { 
+let liftM5 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'x) (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) (me:DocSoup<'e>) : DocSoup<'x> = 
+    docSoup { 
         let! a = ma
         let! b = mb
         let! c = mc
@@ -135,352 +122,278 @@ let liftM5 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'x) (ma:DocParser<'a>) (mb:DocParse
         return (fn a b c d e)
     }
 
-let tupleM2 (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'a * 'b> = 
+let tupleM2 (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'a * 'b> = 
     liftM2 (fun a b -> (a,b)) ma mb
 
-let tupleM3 (ma:DocParser<'a>) (mb:DocParser<'b>) (mc:DocParser<'c>) : DocParser<'a * 'b * 'c> = 
+let tupleM3 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) : DocSoup<'a * 'b * 'c> = 
     liftM3 (fun a b c -> (a,b,c)) ma mb mc
 
-let tupleM4 (ma:DocParser<'a>) (mb:DocParser<'b>) (mc:DocParser<'c>) (md:DocParser<'d>) : DocParser<'a * 'b * 'c * 'd> = 
+let tupleM4 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) : DocSoup<'a * 'b * 'c * 'd> = 
     liftM4 (fun a b c d -> (a,b,c,d)) ma mb mc md
 
-let tupleM5 (ma:DocParser<'a>) (mb:DocParser<'b>) (mc:DocParser<'c>) (md:DocParser<'d>) (me:DocParser<'e>) : DocParser<'a * 'b * 'c * 'd * 'e> = 
+let tupleM5 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) (me:DocSoup<'e>) : DocSoup<'a * 'b * 'c * 'd * 'e> = 
     liftM5 (fun a b c d e -> (a,b,c,d,e)) ma mb mc md me
 
-let sequenceM (source:DocParser<'a> list) : DocParser<'a list> = 
-    DocParser <| fun doc focus st0 -> 
-        let rec work ac st ys = 
-            match ys with
-            | [] -> Ok (st, List.rev ac)
-            | ma :: zs -> 
-                match apply1 ma doc focus st with
-                | Err msg -> Err msg
-                | Ok (st1,a) -> work (a::ac) st1 zs
-        work [] st0 source
-
 // Left biased choice, if ``ma`` succeeds return its result, otherwise try ``mb``.
-let alt (ma:DocParser<'a>) (mb:DocParser<'a>) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err _ -> apply1 mb doc focus st0
-        | Ok (st1,a) -> Ok (st1, a)
+let alt (ma:DocSoup<'a>) (mb:DocSoup<'a>) : DocSoup<'a> = 
+    DocSoup <| fun doc focus ->
+        match apply1 ma doc focus with
+        | Err _ -> apply1 mb doc focus
+        | Ok a -> Ok a
 
-let (<|>) (ma:DocParser<'a>) (mb:DocParser<'a>) : DocParser<'a> = alt ma mb
+let (<||>) (ma:DocSoup<'a>) (mb:DocSoup<'a>) : DocSoup<'a> = alt ma mb
 
-// Applicative's (<*>)
-let apM (mf:DocParser<'a ->'b>) (ma:DocParser<'a>) : DocParser<'b> = 
-    docParse { 
+
+// Haskell Applicative's (<*>)
+let apM (mf:DocSoup<'a ->'b>) (ma:DocSoup<'a>) : DocSoup<'b> = 
+    docSoup { 
         let! fn = mf
         let! a = ma
         return (fn a) 
     }
 
+let (<**>) (ma:DocSoup<'a -> 'b>) (mb:DocSoup<'a>) : DocSoup<'b> = apM ma mb
+
+
 // Perform two actions in sequence. Ignore the results of the second action if both succeed.
-let seqL (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'a> = 
-    docParse { 
+let seqL (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'a> = 
+    docSoup { 
         let! a = ma
         let! b = mb
         return a
     }
 
 // Perform two actions in sequence. Ignore the results of the first action if both succeed.
-let seqR (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'b> = 
-    docParse { 
+let seqR (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'b> = 
+    docSoup { 
         let! a = ma
         let! b = mb
         return b
     }
 
-let (.>>) (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'a> = seqL ma mb
-let (>>.) (ma:DocParser<'a>) (mb:DocParser<'b>) : DocParser<'b> = seqR ma mb
+let (.>>>) (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'a> = seqL ma mb
+let (>>>.) (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'b> = seqR ma mb
 
 
-
-let softOption (ma:DocParser<'a>) : DocParser<'a option> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err _ -> Ok (st0, None)
-        | Ok (_,a) -> Ok (st0, Some a)
-
-let optional (ma:DocParser<'a>) : DocParser<'a option> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err _ -> Ok (st0, None)
-        | Ok (st1,a) -> Ok (st1, Some a)
-
-let optionalz (ma:DocParser<'a>) : DocParser<unit> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err _ -> Ok (st0, ())
-        | Ok (st1,_) -> Ok (st1, ())
-
-
-let count (ntimes:int) (ma:DocParser<'a>) : DocParser<'a []> = 
-    DocParser <| fun doc focus st0 ->
-        let rec work ac ix st = 
-            if ix < ntimes then                
-                match apply1 ma doc focus st with
+let mapM (source:'a list) (p: 'a -> DocSoup<'b>) : DocSoup<'b list> = 
+    DocSoup <| fun doc focus -> 
+        let rec work ac ys = 
+            match ys with
+            | [] -> Ok <| List.rev ac
+            | z :: zs -> 
+                match apply1 (p z) doc focus with
                 | Err msg -> Err msg
-                | Ok (st1,a) -> work (a :: ac) (ix+1) st1
-            else 
-                Ok (st, List.toArray <| List.rev ac)
-        work [] 0 st0
-
-let between (openP:DocParser<'z1>) (closeP:DocParser<'z2>) (p:DocParser<'a>) : DocParser<'a> = 
-    openP >>. (p .>> closeP)
+                | Ok ans -> work (ans::ac) zs
+        work [] source
 
 
-
-let many (ma:DocParser<'a>) : DocParser<'a list> = 
-    DocParser <| fun doc focus st0 ->
-        let rec work ac st = 
-            match apply1 ma doc focus st with
-            | Err _ -> Ok (st,List.rev ac)
-            | Ok (st1,a) -> work (a :: ac) st1
-        work [] st0
-
-let many1 (ma:DocParser<'a>) : DocParser<'a list> = 
-    docParse { 
-        let! a = ma
-        let! rest = many ma
-        return (a::rest)
-    }
-
-let sepBy (p:DocParser<'a>) (sep:DocParser<'b>) : DocParser<'a list> = 
-    let some = 
-        docParse {
-            let! a = p
-            let! rest = many (sep >>. p)
-            return (a::rest)
-        }
-    some <|> preturn []
-
-let sepBy1 (p:DocParser<'a>) (sep:DocParser<'b>) : DocParser<'a list> = 
-    docParse {
-        let! a = p
-        let! rest = many (sep >>. p)
-        return (a::rest)
-    }
-
-// The last sep is optional.
-let sepEndBy (p:DocParser<'a>) (sep:DocParser<'b>) : DocParser<'a list> = 
-    let some = 
-        docParse {
-            let! a = p
-            let! rest = many (sep >>. p)
-            return (a::rest)
-        }
-    (some .>> optional sep) <|> preturn []
+let optional (ma:DocSoup<'a>) : DocSoup<'a option> = 
+    DocSoup <| fun doc focus ->
+        match apply1 ma doc focus with
+        | Err _ -> Ok None
+        | Ok a -> Ok <| Some a
 
 
-// The last sep is optional.
-let sepEndBy1 (p:DocParser<'a>) (sep:DocParser<'b>) : DocParser<'a list> = 
-    let some = 
-        docParse {
-            let! a = p
-            let! rest = many (sep >>. p)
-            return (a::rest)
-        }
-    some .>> optional sep
-    
-let manyTill (p:DocParser<'a>) (terminate:DocParser<'b>) : DocParser<'a list> = 
-    let rec some ac = 
-        optional terminate >>= fun opt -> 
-        match opt with
-        | Some _ -> preturn (List.rev ac)
-        | None -> p >>= fun a -> some (a::ac)
-    some []
-    
-let many1Till (p:DocParser<'a>) (terminate:DocParser<'b>) : DocParser<'a list> = 
-    let rec some ac = 
-        p >>= fun a -> 
-        optional terminate >>= fun opt -> 
-        match opt with
-        | Some _ -> preturn (List.rev (a::ac))
-        | None -> some (a::ac)
-    some []
+let optionalz (ma:DocSoup<'a>) : DocSoup<unit> = 
+    DocSoup <| fun doc focus ->
+        match apply1 ma doc focus with
+        | Err _ -> Ok ()
+        | Ok _ -> Ok ()
 
+type FallBackResult<'a> = 
+    | ParseOk of 'a
+    | FallBackText of string
 
+// We expect string level parsers might fail.
+// Rather than throw a hard fail, get the source input instead.
+let textFallBack (ma:DocSoup<'a>) : DocSoup<FallBackResult<'a>> = 
+    DocSoup <| fun doc focus ->
+        let text = regionText focus doc
+        match apply1 ma doc focus with
+        | Err _ -> Ok <| FallBackText text
+        | Ok a -> Ok <| ParseOk a
+
+// *************************************
 // Run functions
-let runOnFile (ma:DocParser<'a>) (fileName:string) : Ans<'a> =
-    if System.IO.File.Exists (fileName) then
-        let app = new Word.ApplicationClass (Visible = true) 
-        let doc = app.Documents.Open(FileName = ref (fileName :> obj))
-        let region1 = maxRegion doc
-        let text1 = regionText region1 doc
-        let ans = apply1 ma doc region1 (State text1)
-        doc.Close(SaveChanges = ref (box false))
-        app.Quit()
-        ans
-    else Err <| sprintf "Cannot find file %s" fileName
 
-let runOnFileE (ma:DocParser<'a>) (fileName:string) : 'a =
+let runOnFile (ma:DocSoup<'a>) (fileName:string) : Result<'a> =
+    if System.IO.File.Exists (fileName) then
+        let app = new Word.ApplicationClass (Visible = false) :> Word.Application
+        try 
+            let doc = app.Documents.Open(FileName = ref (fileName :> obj))
+            let region1 = maxRegion doc
+            let ans = apply1 ma doc region1
+            doc.Close(SaveChanges = rbox false)
+            app.Quit()
+            ans
+        with
+        | ex -> 
+            try 
+                app.Quit ()
+                Err ex.Message
+            with
+            | _ -> Err ex.Message
+                
+    else 
+        Err <| sprintf "Cannot find file %s" fileName
+
+
+let runOnFileE (ma:DocSoup<'a>) (fileName:string) : 'a =
     match runOnFile ma fileName with
     | Err msg -> failwith msg
-    | Ok (_,a) -> a
+    | Ok a -> a
 
+let throwError (msg:string) : DocSoup<'a> = 
+    DocSoup <| fun _  _ -> Err msg
 
-let throwError (msg:string) : DocParser<'a> = 
-    DocParser <| fun _ _  _ -> Err msg
-
-let swapError (msg:string) (ma:DocParser<'a>) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
+let swapError (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    DocSoup <| fun doc focus ->
+        match apply1 ma doc focus with
         | Err _ -> Err msg
-        | Ok (st1,a) -> Ok (st1,a)
+        | Ok a -> Ok a
 
-let (<?>) (ma:DocParser<'a>) (msg:string) : DocParser<'a> = swapError msg ma
-
-let augmentError (fn:string -> string) (ma:DocParser<'a>) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 ->
-        match apply1 ma doc focus st0 with
-        | Err msg -> Err <| fn msg
-        | Ok (st1,a) -> Ok (st1,a)
-
-let withInput (fn:string -> Ans<'a>) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 ->
-        try
-            match st0 with | State(s) -> fn s
-        with    
-        | ex -> Err "withInput"
+let (<??>) (ma:DocSoup<'a>) (msg:string) : DocSoup<'a> = swapError msg ma
 
 
+let focus (region:Region) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    DocSoup <| fun doc _ -> apply1 ma doc region
+
+let fparse (p:TextParser<'a>) : DocSoup<'a> = 
+    DocSoup <| fun doc focus -> execFParsec doc focus p 
 
 
-// Get the text in the currently focused region.
-
-// Returns the raw text that may include control characters.
-// Shouldn't expose this...
-let rawText : DocParser<string> = 
-    DocParser <| fun doc focus st0 -> 
-        match st0 with
-        | State(s) -> Ok (st0,s)
-            
-
-
-// Removes all control characters except CR & LF.
-let cleanText : DocParser<string> = 
-    fmapM (fun (s:string) -> Regex.Replace(s, @"[\p{C}-[\r\n]]+", "")) rawText
-
-
-
-// Get the currently focused region.
-let askFocus : DocParser<Region> = 
-    DocParser <| fun _ focus st0 ->  
-        Ok (st0,focus)
-
-let asksFocus (fn:Region -> 'a) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 ->  
-        Ok (st0, fn focus)
-
-let local (project:Region -> Region) (ma:DocParser<'a>) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 ->  
-        apply1 ma doc (project focus) st0
-
-
-
-
-
-// Probably should not be part of the API...
-let liftGlobalOperation (fn : Word.Document -> 'a) : DocParser<'a> = 
-    DocParser <| fun doc _ st0 ->
-        try
-            Ok (st0, fn doc)
-        with
-        | ex -> Err <| ex.ToString()
-
-
-let liftOperation (fn : Word.Range -> 'a) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 ->
-        try
-            let range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
-            Ok (st0, fn range)
-        with
-        | ex -> Err <| ex.ToString()
-
-
-
-// Range delimited.
-let countTables : DocParser<int> = 
-    liftOperation <| fun doc -> doc.Tables.Count
-
-
-// Range delimited.
-let countSections : DocParser<int> = 
-    liftOperation <| fun rng -> rng.Sections.Count
-
-// Range delimited.
-let countCells : DocParser<int> = 
-    liftOperation <| fun rng -> rng.Cells.Count
-
-// Range delimited.
-let countParagraphs : DocParser<int> = 
-    liftOperation <| fun rng -> rng.Paragraphs.Count
-
-// Range delimited.
-let countCharacters : DocParser<int> = 
-    liftOperation <| fun rng -> rng.Characters.Count
-
-let table (index:int) (ma:DocParser<'a>) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 -> 
-        try 
-            let range0:Word.Range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
-            let table1:Word.Table = range0.Tables.[index]
-            let range1:Word.Range = table1.Range
-            apply1 ma doc (extractRegion range1) st0
-        with
-        | ex -> Err <| ex.ToString() 
-
-
-// Needs a better name...
-let mapTablesWith (ma:DocParser<'a>) : DocParser<'a list> = 
-    DocParser <| fun doc focus st0 -> 
-        try 
-            let range0:Word.Range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
-            let tables:Word.Table list = (range0.Tables |> Seq.cast<Word.Table> |> Seq.toList)
-            ansMapM (fun table st -> let region = extractRegion (table :> Word.Table).Range in apply1 ma doc region st) st0 tables
-        with
-        | ex -> Err <| ex.ToString() 
-
-
-// Strangely this appears to count from zero
-let cell (row:int, col:int) (ma:DocParser<'a>) : DocParser<'a> = 
-    DocParser <| fun doc focus st0 -> 
-        try 
-            let range0:Word.Range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
-            let table1:Word.Table = range0.Tables.[1]
-            let range1:Word.Range = table1.Cell(row,col).Range
-            apply1 ma doc (extractRegion range1) st0
-        with
-        | ex -> Err <| ex.ToString() 
-
-
-let mapCellsWith (ma:DocParser<'a>) : DocParser<'a list> = 
-    DocParser <| fun doc focus st0 -> 
-        try 
-            let range0:Word.Range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
-            let cells:Word.Cell list = (range0.Cells |> Seq.cast<Word.Cell> |> Seq.toList)
-            ansMapM (fun cell st -> let region = extractRegion (cell :> Word.Cell).Range in apply1 ma doc region st) st0 cells
-        with
-        | ex -> Err <| ex.ToString() 
-
-
-let findText (search:string) : DocParser<Region> =
-    DocParser <| fun doc focus st0 -> 
-        printfn "Focus: %A" focus
-        let range1 = getRange focus doc
-        printfn "range1: %A" range1
-        range1.Find.ClearFormatting ()
-        printfn "range1: formattting cleared."
-        if range1.Find.Execute (FindText = rbox search) then
-            printfn "Ok"
-            Ok(st0, extractRegion range1)
-        else
-            printfn "Err"
-            Err "findText - not found"
-    
+/// This gets the text within the cuurent focus!        
+let getText : DocSoup<string> =
+    DocSoup <| fun doc focus -> 
+        let text = regionText focus doc 
+        Ok text
         
-let getRegionText (region:Region) : DocParser<string> =
-    DocParser <| fun doc focus st0 -> 
-        let text = regionText region doc 
-        Ok (st0, text)
+
+let findText (search:string) (matchCase:bool) : DocSoup<Region> =
+    DocSoup <| fun doc focus  -> 
+        let range1 = getRange focus doc
+        range1.Find.ClearFormatting ()
+        if range1.Find.Execute (FindText = rbox search, 
+                                MatchCase = rbox matchCase,
+                                MatchWildcards = rbox false,
+                                Forward = rbox true) then
+            Ok <| extractRegion range1
+        else
+            Err <| sprintf "findText - '%s' not found" search
+
+/// Case sensitivity always appears to be true for Wildcard matches.
+let findPattern (search:string) : DocSoup<Region> =
+    DocSoup <| fun doc focus  -> 
+        let range1 = getRange focus doc
+        range1.Find.ClearFormatting ()
+        if range1.Find.Execute (FindText = rbox search, 
+                                MatchWildcards = rbox true,
+                                MatchCase = rbox true,
+                                Forward = rbox true) then
+            Ok <| extractRegion range1
+        else
+            Err <| sprintf "findText - '%s' not found" search
+
+let findTextMany (search:string) (matchCase:bool) : DocSoup<Region list> =
+    let rec work (rng:Word.Range) (ac: Region list) : Result<Region list> = 
+        rng.Find.Execute (FindText = rbox search, 
+                            MatchCase = rbox matchCase,
+                            MatchWildcards = rbox false,
+                            Forward = rbox true) |> ignore
+        if rng.Find.Found then
+            let region = extractRegion rng
+            work rng (region::ac)
+        else
+            Ok <| List.rev ac
+
+    DocSoup <| fun doc focus  -> 
+        let range1 = getRange focus doc
+        range1.Find.ClearFormatting ()
+        work range1 []
+
+
+/// Case sensitivity always appears to be true for Wildcard matches.
+let findPatternMany (search:string) : DocSoup<Region list> =
+    let rec work (rng:Word.Range) (ac: Region list) : Result<Region list> = 
+        rng.Find.Execute (FindText = rbox search, 
+                            MatchWildcards = rbox true,
+                            MatchCase = rbox true,
+                            Forward = rbox true) |> ignore
+        if rng.Find.Found then
+            let region = extractRegion rng
+            work rng (region::ac)
+        else
+            Ok <| List.rev ac
+
+    DocSoup <| fun doc focus  -> 
+        let range1 = getRange focus doc
+        range1.Find.ClearFormatting ()
+        work range1 []
+
+
+let private getTablesInFocus : DocSoup<Word.Table []> = 
+    DocSoup <| fun doc focus -> 
+        try 
+            let rec work (ac:Word.Table list) (source:Word.Table list) = 
+                match source with
+                | [] -> List.rev ac |> List.toArray
+                | (t :: ts) -> 
+                    let tregion = t.Range |> extractRegion
+                    if isSubregionOf focus tregion then 
+                        work (t::ac) ts
+                    else
+                        work ac ts
+            let wholeDoc:Word.Range = doc.Range()
+            let allTables : Word.Table list = 
+                doc.Range().Tables |> Seq.cast<Word.Table> |> Seq.toList
+            Ok <| work [] allTables
+        with
+        | _ -> Err "getTablesInFocus"
+
+
+/// Note - the results will be within the current focus!
+let tableAreas : DocSoup<Region []> = 
+    let extrRegions = Array.map (fun (table:Word.Table) -> table.Range |> extractRegion)
+    fmapM extrRegions getTablesInFocus
+    
+
+
+
+/// Note - the results are indexed within the current focus.
+/// Note - this is zero indexed (unlike Word's automation API)
+let getTableArea(tid:TableAnchor) : DocSoup<Region> = 
+    let index = getTableId tid
+    tableAreas >>>= fun arr -> 
+    try 
+        sreturn arr.[index]
+    with
+    | _ -> throwError 
+            (sprintf "getTable - index out of range ix:%i [tables: %i]" index arr.Length)
+
+
+
+let containingTable (needle:Region) : DocSoup<TableAnchor> = 
+    tableAreas >>>= fun arr -> 
+    match Array.tryFindIndex (fun rgn -> isSubregionOf rgn needle) arr with
+    | Some ix -> sreturn (TableAnchor ix)
+    | None -> throwError "No containingTable found."
+
+
+let containingCell (needle:Region) : DocSoup<CellAnchor> = 
+    let rec work (tix:int) (tables:Word.Table list) : CellAnchor option = 
+        let test (cell:Word.Cell) : bool = 
+            isSubregionOf (extractRegion cell.Range) needle
+        match tables with
+        | [] -> None
+        | (t :: ts) -> 
+            match tryFindCell test t with
+            | Some cell -> Some { TableIndex = TableAnchor tix;
+                                    RowIndex = cell.RowIndex;
+                                    ColumnIndex = cell.ColumnIndex }
+            | None -> work (tix+1) ts
+
+    getTablesInFocus >>>= fun arr -> 
+    match work 0 (Array.toList arr) with
+    | Some cid -> sreturn cid
+    | None -> throwError "containingCell"
+    
