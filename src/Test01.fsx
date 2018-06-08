@@ -122,3 +122,16 @@ let test17 () =
     let proc : DocSoup<_> = 
         findCell "Scope of Works" true 
     runOnFileE proc testDoc |> printfn "%A"
+
+
+let test18 () =
+    let proc : DocSoup<_> = 
+        docSoup { 
+            let! sow = findTable "Scope of Works" true 
+            let! ans = 
+                focusTable sow (
+                    findCell "Scope of Works" true >>>= cellBelow >>>= cellBelow >>>= cellText
+                )
+            return ans
+        }
+    runOnFileE proc testDoc |> printfn "%A"

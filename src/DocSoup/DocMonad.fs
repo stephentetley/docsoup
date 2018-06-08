@@ -311,12 +311,13 @@ let fparse (p:TextParser<'a>) : DocSoup<'a> =
     DocSoup <| fun doc focus -> execFParsec doc focus p 
 
 
-/// This gets the text within the cuurent focus!        
+/// This gets the text within the current focus!        
 let getText : DocSoup<string> =
     DocSoup <| fun doc focus -> 
         let text = regionText focus doc 
         Ok text
-        
+
+
 
 let findText (search:string) (matchCase:bool) : DocSoup<Region> =
     DocSoup <| fun doc focus  -> 
@@ -476,6 +477,13 @@ let private getCell (anchor:CellAnchor) : DocSoup<Word.Cell> =
     with
     | _ -> throwError "getCell error (index out-of-range?)"
 
+        
+let cellText (anchor:CellAnchor) : DocSoup<string> =
+    getCell anchor >>>= fun whole -> focus (extractRegion whole.Range) getText
+
+let tableText (anchor:TableAnchor) : DocSoup<string> =
+    getTable anchor >>>= fun whole -> focus (extractRegion whole.Range) getText
+
 
 let focusTable (anchor:TableAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
     getTable anchor >>>= fun table ->
@@ -609,19 +617,19 @@ let parentTable (cell:CellAnchor) : DocSoup<TableAnchor> =
     sreturn cell.TableIndex
 
 let cellLeft (cell:CellAnchor) : DocSoup<CellAnchor> = 
-    let c1 = { cell with RowIndex = cell.RowIndex - 1} 
+    let c1 = { cell with ColumnIndex = cell.ColumnIndex - 1} 
     assertCellInFocus c1 >>>. sreturn c1
 
 
 let cellRight (cell:CellAnchor) : DocSoup<CellAnchor> = 
-    let c1 = { cell with RowIndex = cell.RowIndex + 1} 
-    assertCellInFocus c1 >>>. sreturn c1
-
-let cellBelow (cell:CellAnchor) : DocSoup<CellAnchor> = 
     let c1 = { cell with ColumnIndex = cell.ColumnIndex + 1} 
     assertCellInFocus c1 >>>. sreturn c1
 
+let cellBelow (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with RowIndex = cell.RowIndex + 1} 
+    assertCellInFocus c1 >>>. sreturn c1
+
 let cellAbove (cell:CellAnchor) : DocSoup<CellAnchor> = 
-    let c1 = { cell with ColumnIndex = cell.ColumnIndex - 1} 
+    let c1 = { cell with RowIndex = cell.RowIndex - 1} 
     assertCellInFocus c1 >>>. sreturn c1
 

@@ -54,14 +54,6 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="DocSoup\Base.fs" />
     <Compile Include="DocSoup\DocMonad.fs" />
-    <Compile Include="Old\Extractors.fs" />
-    <Compile Include="Old\RangeOperations.fs" />
-    <Compile Include="Old\Regions.fs" />
-    <Compile Include="Old\DocMonad.fs" />
-    <Compile Include="Old\CharParsers.fs" />
-    <None Include="OldTest.fsx" />
-    <None Include="OldTestRange.fsx" />
-    <None Include="OldTest01.fsx" />
     <None Include="Test01.fsx" />
     <Content Include="packages.config" />
     <COMReference Include="Microsoft Office 16.0 Object Library">
