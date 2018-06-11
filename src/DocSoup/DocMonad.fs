@@ -315,7 +315,7 @@ let fparse (p:TextParser<'a>) : DocSoup<'a> =
 let getText : DocSoup<string> =
     DocSoup <| fun doc focus -> 
         let text = regionText focus doc 
-        Ok text
+        Ok <| text.Trim ()
 
 
 
