@@ -24,6 +24,40 @@ type SurveyHeader =
       EngineerName: string
       SurveyDate: string }
 
+// Store relay number inside the data. This means we can have a sparse list of
+// relays.
+type RelaySetting = 
+    { RelayNumber: int
+      RelayFunction: string
+      OnSetPoint: string
+      OffSetPoint: string }
+    member v.isEmpty = 
+        v.RelayFunction = "" 
+            && v.OnSetPoint = ""
+            && v.OffSetPoint = ""
+
+
+type UltrasonicInfo = 
+    { MonitoredDischarge: string 
+      ProcessOrFacilityName: string
+      Manufacturer: string
+      Model: string
+      SerialNumber: string
+      PITag: string
+      EmptyDistance: string
+      Span: string
+      Relays: RelaySetting list }
+    member v.isEmpty = 
+        v.ProcessOrFacilityName = "" 
+            && v.Manufacturer = "" 
+            && v.Model = ""
+            && v.SerialNumber = ""
+            && v.PITag = ""
+            && v.EmptyDistance = ""
+            && v.Span = ""
+            && v.Relays.IsEmpty
+
+
 type OverflowType = SCREENED | UNSCREENED
 
 type ChamberInfo = 
@@ -43,17 +77,6 @@ type ChamberInfo =
             && v.ScreenToInvert = ""
             && v.EmergencyOverflowToInvert = ""
 
-type UltrasonicInfo = 
-    { MonitoredDischarge: string 
-      ProcessOrFacilityName: string
-      Manufacturer: string
-      Model: string
-      SerialNumber: string }
-    member v.isEmpty = 
-        v.ProcessOrFacilityName = "" 
-            && v.Manufacturer = "" 
-            && v.Model = ""
-            && v.SerialNumber = ""
 
 type Survey = 
     { SurveyHeader: SurveyHeader
@@ -65,7 +88,6 @@ type Survey =
 let getFieldValue (search:string) (matchCase:bool) : DocSoup<string> = 
     let good = findCell search matchCase >>>= cellRight >>>= cellText
     good <||> sreturn ""
-
 
 let getFieldValuePattern (search:string)  : DocSoup<string> = 
     let good = findCellPattern search >>>= cellRight >>>= cellText
@@ -111,27 +133,54 @@ let extractSurveyHeader : DocSoup<SurveyHeader> =
         let! (sname,dname) = extractSiteDetails
         let! (engineer, sdate) = extractSurveyInfo
         return { 
-            SiteName = sname;
-            DischargeName = dname;
-            EngineerName = engineer;
+            SiteName = sname
+            DischargeName = dname
+            EngineerName = engineer
             SurveyDate = sdate }
     }
 
+// Focus should already be limited to the table in question.
+let extractRelay (relayNumber:int) : DocSoup<RelaySetting> = 
+    let funPattern = sprintf "Relay*%i*Function" relayNumber
+    let onPattern = sprintf "Relay*%i*On" relayNumber
+    let offPattern = sprintf "Relay*%i*Off" relayNumber
+    let makeSetting (funId:string) (onSet:string) (offSet:string) : RelaySetting = 
+        { RelayNumber = relayNumber
+          RelayFunction = funId
+          OnSetPoint = onSet
+          OffSetPoint = offSet }
+    pipeM3 (getFieldValuePattern funPattern)
+            (getFieldValuePattern onPattern)
+            (getFieldValuePattern offPattern)
+            makeSetting
+
+let extractRelays : DocSoup<RelaySetting list> = 
+    mapM extractRelay [1..6] |>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
 let extractUltrasonicInfo1 (anchor:TableAnchor) : DocSoup<UltrasonicInfo> = 
     let makeInfo (disName:string) (procName:string) (manu:string) 
-                    (model:string) (snumber:string) : UltrasonicInfo  = 
+                    (model:string) (snumber:string) (piTag:string)
+                    (emptyDist:string) (span:string) 
+                    (relays:RelaySetting list) : UltrasonicInfo  = 
         { MonitoredDischarge = disName;
           ProcessOrFacilityName = procName;
           Manufacturer = manu;
           Model = model;
-          SerialNumber = snumber }
+          SerialNumber = snumber;
+          PITag = piTag;
+          EmptyDistance = emptyDist;
+          Span = span;
+          Relays = relays}
     focusTable anchor <| 
         (makeInfo   <&&> (getFieldValue "Discharge Being Monitored" false)
                     <**> (getFieldValue "Process or Facility" false)
                     <**> (getFieldValue "Manufacturer" false)
                     <**> (getFieldValue "Model" false)
                     <**> (getFieldValue "Serial Number" false)
+                    <**> (getFieldValue "P & I Tag" false)
+                    <**> (getFieldValue "Empty Distance" false)
+                    <**> (getFieldValue "Span" false)
+                    <**> mapM extractRelay [1..6]
                     )
 
 let extractUltrasonicInfos : DocSoup<UltrasonicInfo list>= 

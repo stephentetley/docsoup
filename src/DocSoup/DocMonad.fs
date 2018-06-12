@@ -427,19 +427,10 @@ let findPatternAll (searches:string list) : DocSoup<Region> =
 let private getTablesInFocus : DocSoup<Word.Table []> = 
     DocSoup <| fun doc focus -> 
         try 
-            let rec work (ac:Word.Table list) (source:Word.Table list) = 
-                match source with
-                | [] -> List.rev ac |> List.toArray
-                | (t :: ts) -> 
-                    let tregion = t.Range |> extractRegion
-                    if isSubregionOf focus tregion then 
-                        work (t::ac) ts
-                    else
-                        work ac ts
-            let wholeDoc:Word.Range = doc.Range()
-            let allTables : Word.Table list = 
-                doc.Range().Tables |> Seq.cast<Word.Table> |> Seq.toList
-            Ok <| work [] allTables
+            // O
+            let focusTables : Word.Table [] = 
+                doc.Range(Start = rbox focus.RegionStart, End = rbox focus.RegionEnd ).Tables |> Seq.cast<Word.Table> |> Seq.toArray
+            Ok <| focusTables
         with
         | _ -> Err "getTablesInFocus"
 
