@@ -122,6 +122,19 @@ let liftM5 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'x) (ma:DocSoup<'a>) (mb:DocSoup<'b
         return (fn a b c d e)
     }
 
+let liftM6 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'f -> 'x) 
+            (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) 
+            (md:DocSoup<'d>) (me:DocSoup<'e>) (mf:DocSoup<'f>) : DocSoup<'x> = 
+    docSoup { 
+        let! a = ma
+        let! b = mb
+        let! c = mc
+        let! d = md
+        let! e = me
+        let! f = mf
+        return (fn a b c d e f)
+    }
+
 let tupleM2 (ma:DocSoup<'a>) (mb:DocSoup<'b>) : DocSoup<'a * 'b> = 
     liftM2 (fun a b -> (a,b)) ma mb
 
@@ -133,6 +146,24 @@ let tupleM4 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) 
 
 let tupleM5 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) (me:DocSoup<'e>) : DocSoup<'a * 'b * 'c * 'd * 'e> = 
     liftM5 (fun a b c d e -> (a,b,c,d,e)) ma mb mc md me
+
+let tupleM6 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) (me:DocSoup<'e>) (mf:DocSoup<'f>) : DocSoup<'a * 'b * 'c * 'd * 'e * 'f> = 
+    liftM6 (fun a b c d e f -> (a,b,c,d,e,f)) ma mb mc md me mf
+
+let pipeM2 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (fn:'a -> 'b -> 'x) : DocSoup<'x> = 
+    liftM2 fn ma mb
+
+let pipeM3 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (fn:'a -> 'b -> 'c -> 'x): DocSoup<'x> = 
+    liftM3 fn ma mb mc
+
+let pipeM4 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) (fn:'a -> 'b -> 'c -> 'd -> 'x) : DocSoup<'x> = 
+    liftM4 fn ma mb mc md
+
+let pipeM5 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) (me:DocSoup<'e>) (fn:'a -> 'b -> 'c -> 'd -> 'e ->'x): DocSoup<'x> = 
+    liftM5 fn ma mb mc md me
+
+let pipeM6 (ma:DocSoup<'a>) (mb:DocSoup<'b>) (mc:DocSoup<'c>) (md:DocSoup<'d>) (me:DocSoup<'e>) (mf:DocSoup<'f>) (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'f -> 'x): DocSoup<'x> = 
+    liftM6 fn ma mb mc md me mf
 
 // Left biased choice, if ``ma`` succeeds return its result, otherwise try ``mb``.
 let alt (ma:DocSoup<'a>) (mb:DocSoup<'a>) : DocSoup<'a> = 
@@ -153,6 +184,8 @@ let apM (mf:DocSoup<'a ->'b>) (ma:DocSoup<'a>) : DocSoup<'b> =
     }
 
 let (<**>) (ma:DocSoup<'a -> 'b>) (mb:DocSoup<'a>) : DocSoup<'b> = apM ma mb
+
+let (<&&>) (fn:'a -> 'b) (ma:DocSoup<'a>) :DocSoup<'b> = fmapM fn ma
 
 
 // Perform two actions in sequence. Ignore the results of the second action if both succeed.
@@ -301,7 +334,7 @@ let swapError (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> =
         | Err _ -> Err msg
         | Ok a -> Ok a
 
-let (<??>) (ma:DocSoup<'a>) (msg:string) : DocSoup<'a> = swapError msg ma
+let (<&?>) (ma:DocSoup<'a>) (msg:string) : DocSoup<'a> = swapError msg ma
 
 
 let focus (region:Region) (ma:DocSoup<'a>) : DocSoup<'a> = 
@@ -523,7 +556,8 @@ let findTablePattern (search:string) : DocSoup<TableAnchor> =
     findPatternMany search >>>= findSuccessM containingTable
 
 
-    
+/// Finds tables containing a match.
+/// If a match is found in "water" before a table, we continue the search.    
 let findTables (search:string) (matchCase:bool) : DocSoup<TableAnchor list> =
     findTextMany search matchCase >>>= findSuccessesM containingTable
 
@@ -531,7 +565,7 @@ let findTables (search:string) (matchCase:bool) : DocSoup<TableAnchor list> =
 let findTablesPattern (search:string) : DocSoup<TableAnchor list> =
     findPatternMany search >>>= findSuccessesM containingTable
 
-
+/// Find first table that contains all the strings in the list of searches.
 let findTableAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor> =
     let rec work (ss:string list) (anchors: TableAnchor list) = 
         match anchors with
@@ -548,7 +582,7 @@ let findTableAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor> 
         findTables s matchCase >>>= fun tables -> 
         work ss tables
 
-
+/// Find tables that contain all the strings in the list of searches.
 let findTablesAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor list> =
     let rec work (ss:string list) (ac: TableAnchor list) (anchors: TableAnchor list)  = 
         match anchors with
