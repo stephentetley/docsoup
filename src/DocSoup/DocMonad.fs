@@ -557,6 +557,7 @@ let findTablesPattern (search:string) : DocSoup<TableAnchor list> =
     findPatternMany search >>>= findSuccessesM containingTable
 
 /// Find first table that contains all the strings in the list of searches.
+/// THIS IS PROBABLY NOT WORKING CORRECTLY
 let findTableAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor> =
     let rec work (ss:string list) (anchors: TableAnchor list) = 
         match anchors with
@@ -574,6 +575,7 @@ let findTableAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor> 
         work ss tables
 
 /// Find tables that contain all the strings in the list of searches.
+/// THIS IS PROBABLY NOT WORKING CORRECTLY
 let findTablesAll (searches:string list) (matchCase:bool) : DocSoup<TableAnchor list> =
     let rec work (ss:string list) (ac: TableAnchor list) (anchors: TableAnchor list)  = 
         match anchors with

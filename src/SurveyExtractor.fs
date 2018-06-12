@@ -24,6 +24,18 @@ type SurveyHeader =
       EngineerName: string
       SurveyDate: string }
 
+type OutstationInfo = 
+    { OutstationName: string
+      RtuAddress: string
+      OutstationType: string
+      SerialNumber: string }
+    member v.isEmpty = 
+        v.OutstationName = ""
+            && v.RtuAddress = ""
+            && v.OutstationType = ""
+            && v.SerialNumber = ""
+
+
 // Store relay number inside the data. This means we can have a sparse list of
 // relays.
 type RelaySetting = 
@@ -77,11 +89,22 @@ type ChamberInfo =
             && v.ScreenToInvert = ""
             && v.EmergencyOverflowToInvert = ""
 
+type OutfallInfo = 
+    { DischargeName: string 
+      OutfallGridRef: string
+      OutfallProven: string }
+    member v.isEmpty = 
+        v.OutfallGridRef = ""
+            && v.OutfallProven = ""
 
 type Survey = 
     { SurveyHeader: SurveyHeader
+      OutstationInfo: option<OutstationInfo>
       UltrasonicInfos: UltrasonicInfo list
-      ChamberInfos: ChamberInfo list }
+      ChamberInfos: ChamberInfo list 
+      OutfallInfos: OutfallInfo list
+      ScopeOfWorks: string 
+      AppendixText: string }
 
 /// Utility parsers
 
@@ -139,6 +162,24 @@ let extractSurveyHeader : DocSoup<SurveyHeader> =
             SurveyDate = sdate }
     }
 
+let extractOutstationInfo : DocSoup<OutstationInfo option> = 
+    let parser1 : DocSoup<OutstationInfo> = 
+        docSoup { 
+            let! name = getFieldValue "Outstation Name" false
+            let! rtuAddr = getFieldValue "RTU Address" false
+            let! otype = getFieldValue "Outstation Type" false
+            let! snumber = getFieldValue "Serial Number" false
+            return { 
+                OutstationName = name
+                RtuAddress = rtuAddr
+                OutstationType = otype 
+                SerialNumber = snumber } 
+        }
+    let toOpt (outstation:OutstationInfo) =
+        if outstation.isEmpty then None else Some outstation
+    findTable "Outstation" false >>>= fun anchor -> 
+        focusTable anchor parser1 |>>> toOpt
+ 
 // Focus should already be limited to the table in question.
 let extractRelay (relayNumber:int) : DocSoup<RelaySetting> = 
     let funPattern = sprintf "Relay*%i*Function" relayNumber
@@ -180,8 +221,7 @@ let extractUltrasonicInfo1 (anchor:TableAnchor) : DocSoup<UltrasonicInfo> =
                     <**> (getFieldValue "P & I Tag" false)
                     <**> (getFieldValue "Empty Distance" false)
                     <**> (getFieldValue "Span" false)
-                    <**> mapM extractRelay [1..6]
-                    )
+                    <**> extractRelays )
 
 let extractUltrasonicInfos : DocSoup<UltrasonicInfo list>= 
     let dict: MultiTableParser<UltrasonicInfo> = 
@@ -198,6 +238,8 @@ let extractOverflowType (anchor:TableAnchor) : DocSoup<OverflowType> =
                 | Some _ ,Some _ -> SCREENED
                 | _,_ -> UNSCREENED)
 
+// Note - applicative style parser is not an improvement as we need `makeInfo` 
+// which itself is verbose.
 let extractChamberInfo1 (anchor:TableAnchor) : DocSoup<ChamberInfo> = 
     let makeInfo (otype:OverflowType) (name:string) (roofDist:string) 
                     (usDist:string) (ovDist:string) (scDist:string) 
@@ -225,10 +267,55 @@ let extractChamberInfos : DocSoup<ChamberInfo list>=
           TestNotEmpty = fun (info:ChamberInfo) -> not info.isEmpty }
     parseMultipleTables dict <&?> "ChamberInfos"
 
+let extractOutfallInfo1 (anchor:TableAnchor) : DocSoup<OutfallInfo> = 
+    focusTable anchor <|
+        docSoup { 
+            let! dname = getFieldValue "Discharge Name" false
+            let! gridRef = getFieldValue "Grid Ref" false
+            let! proven = getFieldValue "Outfall Proven" false
+            return { 
+                DischargeName = dname
+                OutfallGridRef = gridRef
+                OutfallProven = proven
+            }
+        }
+
+
+// Note table parser would find finds "OutFall Photos" if we just looked for 
+// "Outfall".
+let extractOutfallInfos : DocSoup<OutfallInfo list>= 
+    let dict: MultiTableParser<OutfallInfo> = 
+        { GetAnchors = findTables "Outfall Proven" false
+          TableParser = extractOutfallInfo1
+          TestNotEmpty = fun (info:OutfallInfo) -> not info.isEmpty }
+    parseMultipleTables dict <&?> "OutfallInfos"
+
+let scopeOfWorks : DocSoup<string> = 
+    let parser1 = 
+        findCell "Scope of Works" false >>>= cellBelow >>>= cellBelow >>>= cellText
+    findTable "Scope of Works"  true >>>= fun anchor -> focusTable anchor parser1
+
+let appendixText : DocSoup<string> = 
+    let parser1 = 
+        findCell "Appendix" false >>>= cellBelow >>>= cellText
+    findTable "Appendix"  true >>>= fun anchor -> focusTable anchor parser1
+
 let parseSurvey : DocSoup<Survey> = 
-    pipeM3 extractSurveyHeader 
-            extractUltrasonicInfos
-            extractChamberInfos
-            (fun a b c -> { SurveyHeader = a; 
-                            UltrasonicInfos = b; 
-                            ChamberInfos = c})
+    docSoup { 
+        let! header         = extractSurveyHeader 
+        let! outstation     = extractOutstationInfo
+        let! ultrasonics    = extractUltrasonicInfos
+        let! chambers       = extractChamberInfos
+        let! outfalls       = extractOutfallInfos
+        let! scope          = scopeOfWorks <||> sreturn ""
+        let! appendix       = appendixText <||> sreturn ""
+        return { 
+            SurveyHeader = header 
+            OutstationInfo = outstation
+            UltrasonicInfos = ultrasonics
+            ChamberInfos = chambers
+            OutfallInfos = outfalls
+            ScopeOfWorks = scope
+            AppendixText = appendix
+            }
+    }
