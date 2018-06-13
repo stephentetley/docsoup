@@ -454,6 +454,42 @@ let findPatternMany (search:string) : DocSoup<Region list> =
         with
         | _ -> Err "findPatternMany"
 
+
+
+
+//let private getTablesInFocus : DocSoup<TableAnchor list> = 
+//    DocSoup <| fun doc focus -> 
+//        try 
+//            let testInFocus (ix:TableAnchor) = 
+//                isSubregionOf focus (extractRegion <| doc.Range().Tables.Item(ix.TableIndex).Range)
+//            let indexes = 
+//                List.map (fun ix -> {TableIndex = ix }) [ 1 .. doc.Range().Tables.Count ]     // 1-indexed
+//            Ok << List.filter testInFocus <| indexes
+//        with
+//        | _ -> Err "getTablesInFocus" 
+
+
+let containingTable (needle:Region) : DocSoup<TableAnchor> = 
+    DocSoup <| fun doc focus -> 
+        let rec work (ix:TableAnchor) = 
+            if ix.TableIndex <= doc.Tables.Count then 
+                let table = doc.Tables.Item (ix.TableIndex)
+                if isSubregionOf (extractRegion table.Range) needle then
+                    Ok ix
+                else work ix.Next
+            else
+                Err "containingTable - needle out of range"
+        try 
+            if isSubregionOf focus needle then
+                work TableAnchor.Zero
+            else
+                Err "containingTable - needle not in focus"
+        with
+        | _ -> Err "containingTable - error"
+    
+        
+        
+
 /// If successful returns the concatenation of all regions.
 let findAll (searches:string list) (matchCase:bool) : DocSoup<Region> =
     mapM (fun s -> findText s matchCase) searches >>>= fun xs ->
@@ -463,39 +499,6 @@ let findAll (searches:string list) (matchCase:bool) : DocSoup<Region> =
 let findPatternAll (searches:string list) : DocSoup<Region> =
     mapM findPattern searches >>>= fun xs ->
     optionToAction (regionConcat xs) "findAllPattern - fail" 
-
-
-let private getTablesInFocus : DocSoup<TableAnchor list> = 
-    DocSoup <| fun doc focus -> 
-        try 
-            let testInFocus (ix:TableAnchor) = 
-                isSubregionOf focus (extractRegion <| doc.Range().Tables.Item(ix.TableIndex).Range)
-            let indexes = 
-                List.map (fun ix -> {TableIndex = ix }) [ 1 .. doc.Range().Tables.Count ]     // 1-indexed
-            Ok << List.filter testInFocus <| indexes
-        with
-        | _ -> Err "getTablesInFocus" 
-
-
-let containingTable (needle:Region) : DocSoup<TableAnchor> = 
-    let rec findNeedle (xs:TableAnchor list) : DocSoup<TableAnchor option> = 
-        match xs with
-        | [] -> sreturn None
-        | a1 :: rest -> 
-            getTable a1 >>>= fun table ->
-            if isSubregionOf (extractRegion table.Range) needle then
-                sreturn (Some a1)
-            else findNeedle rest
-    docSoup { 
-        let! anchors = getTablesInFocus
-        let! ans = findNeedle anchors
-        match ans with
-        | Some anchor -> return anchor
-        | None -> throwError "containingTable - not found" |> ignore
-    }
-        
-        
-
     
 
 let containingCell (needle:Region) : DocSoup<CellAnchor> = 

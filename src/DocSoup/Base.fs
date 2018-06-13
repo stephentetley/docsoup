@@ -88,7 +88,9 @@ let tryFindCell (predicate:Word.Cell -> bool) (table:Word.Table) : option<Word.C
 type TableAnchor = 
     internal 
         { TableIndex: int }
+    static member Zero = { TableIndex = 1 }
     member internal x.Index = x.TableIndex
+    member internal x.Next = { TableIndex = x.TableIndex + 1 }
 
 
 type CellAnchor = 
