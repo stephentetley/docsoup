@@ -99,3 +99,69 @@ type CellAnchor =
     member internal x.TableAnchor : TableAnchor = x.TableIx
     member internal x.Row : int = x.RowIx
     member internal x.Column : int = x.ColumnIx
+
+
+/// Word: Range.Find
+/// Operationally this is quite confusing.
+/// The first success must be withing the range search, e.g:
+/// > doc.Tables(6).Range.Find.Execute (FindText = ...
+/// but successive iterations apparently look after the range found, this
+/// means that results are not bound to be within the initial range.
+
+let boundedFind1 (search:string) (matchCase:bool) (mapper:Word.Range -> 'a) (initialRange:Word.Range) : 'a option = 
+    let regionMax = extractRegion initialRange
+    let range = initialRange
+    range.Find.ClearFormatting ()
+    let found = 
+        range.Find.Execute (FindText = rbox search, 
+                            MatchWildcards = rbox false,
+                            MatchCase = rbox matchCase,
+                            Forward = rbox true) 
+    if found && isSubregionOf regionMax (extractRegion range) then
+        Some <| mapper range
+    else None
+
+
+let boundedFindPattern1 (search:string)  (mapper:Word.Range -> 'a) (initialRange:Word.Range) : 'a option = 
+    let regionMax = extractRegion initialRange
+    let range = initialRange
+    range.Find.ClearFormatting ()
+    let found = 
+        range.Find.Execute (FindText = rbox search, 
+                            MatchWildcards = rbox true,
+                            MatchCase = rbox true,
+                            Forward = rbox true) 
+    if found && isSubregionOf regionMax (extractRegion range) then
+        Some <| mapper range
+    else None
+
+let boundedFindMany (search:string) (matchCase:bool) (mapper:Word.Range -> 'a) (initialRange:Word.Range) : 'a list = 
+    let regionMax = extractRegion initialRange
+    let producer (range:Word.Range) : ('a * Word.Range) option = 
+        let found = 
+            range.Find.Execute (FindText = rbox search, 
+                                MatchWildcards = rbox false,
+                                MatchCase = rbox matchCase,
+                                Forward = rbox true) 
+        if found && isSubregionOf regionMax (extractRegion range) then
+            Some (mapper range, range)    
+        else None
+    initialRange.Find.ClearFormatting ()
+    List.unfold producer initialRange
+
+
+let boundedFindPatternMany (search:string) (mapper:Word.Range -> 'a) (initialRange:Word.Range) : 'a list = 
+    let regionMax = extractRegion initialRange
+    let producer (range:Word.Range) : ('a * Word.Range) option = 
+        let found = 
+            range.Find.Execute (FindText = rbox search, 
+                                MatchWildcards = rbox true,
+                                MatchCase = rbox true,
+                                Forward = rbox true) 
+        if found && isSubregionOf regionMax (extractRegion range) then
+            Some (mapper range, range)    
+        else None
+    initialRange.Find.ClearFormatting ()
+    List.unfold producer initialRange
+
+

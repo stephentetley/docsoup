@@ -424,63 +424,35 @@ let getText : DocSoup<string> =
 let findText (search:string) (matchCase:bool) : DocSoup<Region> =
     DocSoup <| fun doc focus  -> 
         let range1 = getRange focus doc
-        range1.Find.ClearFormatting ()
-        if range1.Find.Execute (FindText = rbox search, 
-                                MatchCase = rbox matchCase,
-                                MatchWildcards = rbox false,
-                                Forward = rbox true) then
-            Ok <| extractRegion range1
-        else
-            Err <| sprintf "findText - '%s' not found" search
+        match boundedFind1 search matchCase extractRegion range1 with
+        | Some region -> Ok region
+        | None -> Err <| sprintf "findText - '%s' not found" search
 
 /// Case sensitivity always appears to be true for Wildcard matches.
 let findPattern (search:string) : DocSoup<Region> =
     DocSoup <| fun doc focus  -> 
         let range1 = getRange focus doc
-        range1.Find.ClearFormatting ()
-        if range1.Find.Execute (FindText = rbox search, 
-                                MatchWildcards = rbox true,
-                                MatchCase = rbox true,
-                                Forward = rbox true) then
-            Ok <| extractRegion range1
-        else
-            Err <| sprintf "findText - '%s' not found" search
+        match boundedFindPattern1 search extractRegion range1 with
+        | Some region -> Ok region
+        | None -> Err <| sprintf "findPattern - '%s' not found" search
+        
 
 let findTextMany (search:string) (matchCase:bool) : DocSoup<Region list> =
-    let rec work (rng:Word.Range) (ac: Region list) : Result<Region list> = 
-        rng.Find.Execute (FindText = rbox search, 
-                            MatchCase = rbox matchCase,
-                            MatchWildcards = rbox false,
-                            Forward = rbox true) |> ignore
-        if rng.Find.Found then
-            let region = extractRegion rng
-            work rng (region::ac)
-        else
-            Ok <| List.rev ac
-
     DocSoup <| fun doc focus  -> 
-        let range1 = getRange focus doc
-        range1.Find.ClearFormatting ()
-        work range1 []
-
+        try 
+            let range1 = getRange focus doc
+            Ok <| boundedFindMany search matchCase extractRegion range1
+        with
+        | _ -> Err "findTextMany"
 
 /// Case sensitivity always appears to be true for Wildcard matches.
 let findPatternMany (search:string) : DocSoup<Region list> =
-    let rec work (rng:Word.Range) (ac: Region list) : Result<Region list> = 
-        rng.Find.Execute (FindText = rbox search, 
-                            MatchWildcards = rbox true,
-                            MatchCase = rbox true,
-                            Forward = rbox true) |> ignore
-        if rng.Find.Found then
-            let region = extractRegion rng
-            work rng (region::ac)
-        else
-            Ok <| List.rev ac
-
     DocSoup <| fun doc focus  -> 
-        let range1 = getRange focus doc
-        range1.Find.ClearFormatting ()
-        work range1 []
+        try 
+            let range1 = getRange focus doc
+            Ok <| boundedFindPatternMany search extractRegion range1
+        with
+        | _ -> Err "findPatternMany"
 
 /// If successful returns the concatenation of all regions.
 let findAll (searches:string list) (matchCase:bool) : DocSoup<Region> =

@@ -304,8 +304,15 @@ let appendixText : DocSoup<string> =
         findCell "Appendix" false >>>= cellBelow >>>= cellText
     findTable "Appendix"  true >>>= fun anchor -> focusTable anchor parser1
 
-let cw (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> = 
-    printfn "%s" msg; ma
+let cw (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> =
+    docSoup { 
+        let stopWatch = System.Diagnostics.Stopwatch.StartNew()
+        do printfn "%s" msg
+        let! ans = ma
+        do stopWatch.Stop()
+        do printfn "... time(ms) %d" stopWatch.ElapsedMilliseconds
+        return ans
+        }
 
 let parseSurvey : DocSoup<Survey> = 
     docSoup { 
