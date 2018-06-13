@@ -12,16 +12,21 @@ open DocSoup
 open FParsec
 open System.IO
 
+
 // Favour strings for data (even for dates, etc.).
 // Word surveys are very "free texty" and there is no guarantee the input data 
 // follows any format.
 
 
 
-type SurveyHeader = 
+type SiteInfo = 
     { SiteName: string
-      DischargeName: string
-      EngineerName: string
+      SaiNumber: string
+      DischargeName: string 
+      ReceivingWatercourse: string }
+
+type SurveyInfo = 
+    { EngineerName: string
       SurveyDate: string }
 
 type OutstationInfo = 
@@ -98,7 +103,8 @@ type OutfallInfo =
             && v.OutfallProven = ""
 
 type Survey = 
-    { SurveyHeader: SurveyHeader
+    { SiteDetails: SiteInfo
+      SurveyInfo: SurveyInfo
       OutstationInfo: option<OutstationInfo>
       UltrasonicInfos: UltrasonicInfo list
       ChamberInfos: ChamberInfo list 
@@ -130,37 +136,35 @@ let parseMultipleTables (dict:MultiTableParser<'answer>) : DocSoup<'answer list>
 
 /// Survey parsers
 
-let extractSiteDetails : DocSoup<string * string> = 
-    docSoup { 
-        let! t0 = findTable "Site Details" true
-        let! ans = 
-            focusTable t0 <|  
-                tupleM2 (getFieldValue "Site Name" true)
-                          (getFieldValue "Discharge Name" true)
-        return ans
-    }
+let extractSiteDetails : DocSoup<SiteInfo> = 
+    let parser1 = 
+        docSoup { 
+            let! sname          = getFieldValue "Site Name" false
+            let! uid            = getFieldValue "SAI Number2" false
+            let! discharge      = getFieldValue "Discharge Name" false
+            let! watercourse    = getFieldValue "Receiving Watercourse" false
+            return {
+                SiteName = sname
+                SaiNumber = uid
+                DischargeName = discharge
+                ReceivingWatercourse = watercourse
+                }
+        }
+    findTable "Site Details" true >>>= fun anchor -> focusTable anchor parser1
 
-let extractSurveyInfo : DocSoup<string * string> = 
-    docSoup { 
-        let! t0 = findTable "Survey Information" true
-        let! ans = 
-            focusTable t0 <|  
-                tupleM2 (getFieldValue "Engineer Name" true)
-                          (getFieldValue "Date of Survey" true)
-        return ans
-    }
+let extractSurveyInfo : DocSoup<SurveyInfo> = 
+    let parser1 =
+        docSoup { 
+            let! name       = getFieldValue "Engineer Name" false
+            let! sdate      = getFieldValue "Date of Survey" false
+            return { 
+                EngineerName = name
+                SurveyDate = sdate
+            }
+        }
+    findTable "Site Details" true >>>= fun anchor -> focusTable anchor parser1
 
 
-let extractSurveyHeader : DocSoup<SurveyHeader> = 
-    docSoup { 
-        let! (sname,dname) = extractSiteDetails
-        let! (engineer, sdate) = extractSurveyInfo
-        return { 
-            SiteName = sname
-            DischargeName = dname
-            EngineerName = engineer
-            SurveyDate = sdate }
-    }
 
 let extractOutstationInfo : DocSoup<OutstationInfo option> = 
     let parser1 : DocSoup<OutstationInfo> = 
@@ -302,7 +306,8 @@ let appendixText : DocSoup<string> =
 
 let parseSurvey : DocSoup<Survey> = 
     docSoup { 
-        let! header         = extractSurveyHeader 
+        let! site           = extractSiteDetails
+        let! surveyInfo     = extractSurveyInfo
         let! outstation     = extractOutstationInfo
         let! ultrasonics    = extractUltrasonicInfos
         let! chambers       = extractChamberInfos
@@ -310,7 +315,8 @@ let parseSurvey : DocSoup<Survey> =
         let! scope          = scopeOfWorks <||> sreturn ""
         let! appendix       = appendixText <||> sreturn ""
         return { 
-            SurveyHeader = header 
+            SiteDetails = site
+            SurveyInfo = surveyInfo
             OutstationInfo = outstation
             UltrasonicInfos = ultrasonics
             ChamberInfos = chambers

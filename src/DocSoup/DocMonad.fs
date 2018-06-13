@@ -9,19 +9,11 @@ open FParsec
 open DocSoup.Base
 
 
-type TextParser<'a> = Parser<'a, unit>
 
 type Result<'a> = 
     | Err of string
     | Ok of 'a
 
-
-let private execFParsec (doc:Word.Document) (region:Region) (p:TextParser<'a>) : Result<'a> = 
-    let text = regionText region doc
-    let name = doc.Name  
-    match runParserOnString p () name text with
-    | Success(ans,_,_) -> Ok ans
-    | Failure(msg,_,_) -> Err msg
 
 
 // DocSoup is Reader(immutable)+Reader+Error
@@ -282,18 +274,8 @@ let boolify (ma:DocSoup<'a>) : DocSoup<bool> =
         | Ok _ -> Ok true
 
 
-type FallBackResult<'a> = 
-    | ParseOk of 'a
-    | FallBackText of string
 
-// We expect string level parsers might fail.
-// Rather than throw a hard fail, get the source input instead.
-let textFallBack (ma:DocSoup<'a>) : DocSoup<FallBackResult<'a>> = 
-    DocSoup <| fun doc focus ->
-        let text = regionText focus doc
-        match apply1 ma doc focus with
-        | Err _ -> Ok <| FallBackText text
-        | Ok a -> Ok <| ParseOk a
+
 
 // *************************************
 // Run functions
@@ -325,6 +307,30 @@ let runOnFileE (ma:DocSoup<'a>) (fileName:string) : 'a =
     | Err msg -> failwith msg
     | Ok a -> a
 
+// We expect string level parsers might fail. 
+// Use this with caution or use execFParsecFallback.
+let execFParsec (parser:Parser<'a, unit>) : DocSoup<'a> = 
+    DocSoup <| fun doc focus ->
+        let text = regionText focus doc
+        let name = doc.Name  
+        match runParserOnString parser () name text with
+        | Success(ans,_,_) -> Ok ans
+        | Failure(msg,_,_) -> Err msg
+
+type FParsecFallback<'a> = 
+    | FParsecOk of 'a
+    | FallbackText of string
+
+// Returns fallback text if FParsec fails.
+let execFParsecFallback (parser:Parser<'a, unit>) : DocSoup<FParsecFallback<'a>> = 
+    DocSoup <| fun doc focus ->
+        let text = regionText focus doc
+        let name = doc.Name  
+        match runParserOnString parser () name text with
+        | Success(ans,_,_) -> Ok <| FParsecOk ans
+        | Failure(msg,_,_) -> Ok <| FallbackText text
+
+
 let throwError (msg:string) : DocSoup<'a> = 
     DocSoup <| fun _  _ -> Err msg
 
@@ -336,12 +342,11 @@ let swapError (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> =
 
 let (<&?>) (ma:DocSoup<'a>) (msg:string) : DocSoup<'a> = swapError msg ma
 
+let (<?&>) (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> = swapError msg ma
+
 
 let focus (region:Region) (ma:DocSoup<'a>) : DocSoup<'a> = 
     DocSoup <| fun doc _ -> apply1 ma doc region
-
-let fparse (p:TextParser<'a>) : DocSoup<'a> = 
-    DocSoup <| fun doc focus -> execFParsec doc focus p 
 
 
 /// This gets the text within the current focus!        
@@ -438,7 +443,7 @@ let private getTablesInFocus : DocSoup<Word.Table []> =
 /// Note - the results will be within the current focus!
 let tableAreas : DocSoup<Region []> = 
     let extrRegions = Array.map (fun (table:Word.Table) -> table.Range |> extractRegion)
-    fmapM extrRegions getTablesInFocus
+    getTablesInFocus |>>> extrRegions 
     
 
 
@@ -503,10 +508,10 @@ let private getCell (anchor:CellAnchor) : DocSoup<Word.Cell> =
 
         
 let cellText (anchor:CellAnchor) : DocSoup<string> =
-    getCell anchor >>>= fun whole -> focus (extractRegion whole.Range) getText
+    getCell anchor >>>= fun containing -> focus (extractRegion containing.Range) getText
 
 let tableText (anchor:TableAnchor) : DocSoup<string> =
-    getTable anchor >>>= fun whole -> focus (extractRegion whole.Range) getText
+    getTable anchor >>>= fun containing -> focus (extractRegion containing.Range) getText
 
 
 let focusTable (anchor:TableAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
