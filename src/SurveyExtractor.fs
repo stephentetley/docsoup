@@ -114,12 +114,14 @@ type Survey =
 
 /// Utility parsers
 
+/// Returns "" if no cell matches the search.
 let getFieldValue (search:string) (matchCase:bool) : DocSoup<string> = 
-    let good = findCell search matchCase >>>= cellRight >>>= cellText
+    let good = findCell search matchCase >>>= cellRight >>>= getCellText
     good <||> sreturn ""
 
-let getFieldValuePattern (search:string)  : DocSoup<string> = 
-    let good = findCellPattern search >>>= cellRight >>>= cellText
+/// Returns "" if no cell matches the search.
+let getFieldValuePattern (search:string) : DocSoup<string> = 
+    let good = findCellPattern search >>>= cellRight >>>= getCellText
     good <||> sreturn ""
 
 type MultiTableParser<'answer> = 
@@ -140,7 +142,7 @@ let extractSiteDetails : DocSoup<SiteInfo> =
     let parser1 = 
         docSoup { 
             let! sname          = getFieldValue "Site Name" false
-            let! uid            = getFieldValue "SAI Number2" false
+            let! uid            = getFieldValue "SAI Number" false
             let! discharge      = getFieldValue "Discharge Name" false
             let! watercourse    = getFieldValue "Receiving Watercourse" false
             return {
@@ -150,7 +152,7 @@ let extractSiteDetails : DocSoup<SiteInfo> =
                 ReceivingWatercourse = watercourse
                 }
         }
-    findTable "Site Details" true >>>= fun anchor -> focusTable anchor parser1
+    focusTableM (findTable "Site Details" true) parser1
 
 let extractSurveyInfo : DocSoup<SurveyInfo> = 
     let parser1 =
@@ -162,43 +164,44 @@ let extractSurveyInfo : DocSoup<SurveyInfo> =
                 SurveyDate = sdate
             }
         }
-    findTable "Site Details" true >>>= fun anchor -> focusTable anchor parser1
+    focusTableM (findTable "Site Details" true) parser1
 
 
 
 let extractOutstationInfo : DocSoup<OutstationInfo option> = 
+    let toOpt (outstation:OutstationInfo) =
+        if outstation.isEmpty then None else Some outstation
+
     let parser1 : DocSoup<OutstationInfo> = 
         docSoup { 
-            let! name = getFieldValue "Outstation Name" false
-            let! rtuAddr = getFieldValue "RTU Address" false
-            let! otype = getFieldValue "Outstation Type" false
-            let! snumber = getFieldValue "Serial Number" false
+            let! name       = getFieldValue "Outstation Name" false
+            let! rtuAddr    = getFieldValue "RTU Address" false
+            let! otype      = getFieldValue "Outstation Type" false
+            let! snumber    = getFieldValue "Serial Number" false
             return { 
                 OutstationName = name
                 RtuAddress = rtuAddr
                 OutstationType = otype 
                 SerialNumber = snumber } 
         }
-    let toOpt (outstation:OutstationInfo) =
-        if outstation.isEmpty then None else Some outstation
-    findTable "Outstation" false >>>= fun anchor -> 
-        focusTable anchor parser1 |>>> toOpt
+    focusTableM (findTable "Outstation" true) (parser1 |>>> toOpt)
  
 // Focus should already be limited to the table in question.
 let extractRelay (relayNumber:int) : DocSoup<RelaySetting> = 
-    let funPattern = sprintf "Relay*%i*Function" relayNumber
-    let onPattern = sprintf "Relay*%i*On" relayNumber
-    let offPattern = sprintf "Relay*%i*Off" relayNumber
-    let makeSetting (funId:string) (onSet:string) (offSet:string) : RelaySetting = 
-        { RelayNumber = relayNumber
-          RelayFunction = funId
-          OnSetPoint = onSet
-          OffSetPoint = offSet }
-    pipeM3 (getFieldValuePattern funPattern)
-            (getFieldValuePattern onPattern)
-            (getFieldValuePattern offPattern)
-            makeSetting
-
+    let funPattern  = sprintf "Relay*%i*Function" relayNumber
+    let onPattern   = sprintf "Relay*%i*On" relayNumber
+    let offPattern  = sprintf "Relay*%i*Off" relayNumber
+    docSoup { 
+        let! relayfunction  = getFieldValuePattern funPattern
+        let! onSetPt        = getFieldValuePattern onPattern
+        let! offSetPt       = getFieldValuePattern offPattern
+        return { 
+            RelayNumber = relayNumber
+            RelayFunction = relayfunction
+            OnSetPoint = onSetPt
+            OffSetPoint = offSetPt 
+            }
+        }
 let extractRelays : DocSoup<RelaySetting list> = 
     mapM extractRelay [1..6] |>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
@@ -235,12 +238,14 @@ let extractUltrasonicInfos : DocSoup<UltrasonicInfo list>=
     parseMultipleTables dict <&?> "UltrasonicInfos"
 
 let extractOverflowType (anchor:TableAnchor) : DocSoup<OverflowType> = 
-    pipeM2 (DocMonad.optional <| findText "Screen to Invert" false)
-            (DocMonad.optional <| findText "Emergency overflow level" false)
-            (fun a b -> 
-                match a,b with
-                | Some _ ,Some _ -> SCREENED
-                | _,_ -> UNSCREENED)
+    focusTable anchor <| 
+        docSoup { 
+            let! a = DocMonad.optional <| findText "Screen to Invert" false
+            let! b = DocMonad.optional <| findText "Emergency overflow level" false
+            match a,b with
+            | Some _, Some _ -> return SCREENED
+            | _, _ -> return UNSCREENED
+        }
 
 // Note - applicative style parser is not an improvement as we need `makeInfo` 
 // which itself is verbose.
@@ -262,7 +267,7 @@ let extractChamberInfo1 (anchor:TableAnchor) : DocSoup<ChamberInfo> =
                     <**> (getFieldValue "Transducer Face to Invert" false)
                     <**> (getFieldValue "Overflow level to Invert" false)
                     <**> (getFieldValuePattern "Bottom*Screen*Invert")
-                    <**> (getFieldValuePattern "Emergency * Invert") )
+                    <**> (getFieldValuePattern "Emergency*Invert") )
 
 let extractChamberInfos : DocSoup<ChamberInfo list>= 
     let dict: MultiTableParser<ChamberInfo> = 
@@ -274,9 +279,9 @@ let extractChamberInfos : DocSoup<ChamberInfo list>=
 let extractOutfallInfo1 (anchor:TableAnchor) : DocSoup<OutfallInfo> = 
     focusTable anchor <|
         docSoup { 
-            let! dname = getFieldValue "Discharge Name" false
-            let! gridRef = getFieldValue "Grid Ref" false
-            let! proven = getFieldValue "Outfall Proven" false
+            let! dname      = getFieldValue "Discharge Name" false
+            let! gridRef    = getFieldValue "Grid Ref" false
+            let! proven     = getFieldValue "Outfall Proven" false
             return { 
                 DischargeName = dname
                 OutfallGridRef = gridRef
@@ -296,13 +301,13 @@ let extractOutfallInfos : DocSoup<OutfallInfo list>=
 
 let scopeOfWorks : DocSoup<string> = 
     let parser1 = 
-        findCell "Scope of Works" false >>>= cellBelow >>>= cellBelow >>>= cellText
-    findTable "Scope of Works"  true >>>= fun anchor -> focusTable anchor parser1
+        findCell "Scope of Works" false >>>= cellBelow >>>= cellBelow >>>= getCellText
+    focusTableM (findTable "Scope of Works" true) parser1
 
 let appendixText : DocSoup<string> = 
     let parser1 = 
-        findCell "Appendix" false >>>= cellBelow >>>= cellText
-    findTable "Appendix"  true >>>= fun anchor -> focusTable anchor parser1
+        findCell "Appendix" false >>>= cellBelow >>>= getCellText
+    focusTableM (findTable "Appendix" true) parser1
 
 let cw (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> =
     docSoup { 

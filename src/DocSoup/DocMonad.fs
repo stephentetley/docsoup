@@ -354,13 +354,14 @@ let (<?&>) (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> = swapError msg ma
 
 
 // *************************************
-// Restricting focus to a part of the input doc.
+// Control focus
 
+
+/// Restrict focus to a part of the input doc identified by region.
 let focus (region:Region) (ma:DocSoup<'a>) : DocSoup<'a> = 
     DocSoup <| fun doc _ -> apply1 ma doc region
 
-/// Version of focus that binds the region returned from a query to limit 
-/// let focus.
+/// Version of focus that binds the region returned from a query.
 let focusM (regionQuery:DocSoup<Region>) (ma:DocSoup<'a>) : DocSoup<'a> = 
     regionQuery >>>= fun region -> focus region ma
 
@@ -372,6 +373,8 @@ let assertInFocus (region:Region) : DocSoup<unit> =
         else
             Err "assertInFocus - outside focus"
 
+ 
+
 
 /// Implementation note - this uses Word's table index (which is 1-indexed, IIRC)
 /// Note, the actual index value should never be exposed to client code.
@@ -382,29 +385,51 @@ let private getTable (anchor:TableAnchor) : DocSoup<Word.Table> =
         if isSubregionOf focus (extractRegion table.Range) then 
             Ok table
         else
-            Err "getTable error (index out-of-focus?)"
+            Err "getTable error (not in focus)"
     with
     | _ -> Err "getTable error (index out-of-range?)"
 
+
+/// Note - potentially not all of the table might be in focus.
 let private getCell (anchor:CellAnchor) : DocSoup<Word.Cell> = 
-    getTable (anchor.TableAnchor) >>>= fun table ->
+    DocSoup <| fun doc focus -> 
     try
-        sreturn <| table.Cell(anchor.Row, anchor.Column)
+        let table : Word.Table = doc.Range().Tables.Item(anchor.TableAnchor.Index)
+        let cell : Word.Cell = table.Cell(anchor.Row, anchor.Column)
+        if isSubregionOf focus (extractRegion cell.Range) then 
+            Ok cell
+        else
+            Err "getCell error (not in focus)"
     with
-    | _ -> throwError "getCell error (index out-of-range?)"
+    | _ -> Err "getCell error (index out-of-range?)"
 
 
-
+/// Restrict focus to a part of the input doc identified by the table anchor.
 let focusTable (anchor:TableAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
-    getTable anchor >>>= fun table ->
-    let region = extractRegion table.Range 
-    focus region ma
+    focusM (getTable anchor |>>> fun table -> extractRegion table.Range) ma
 
+/// Version of focusTable that binds the anchor returned from a query.
+let focusTableM (tableQuery:DocSoup<TableAnchor>) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    tableQuery >>>= fun anchor -> focusTable anchor ma
 
+/// Restrict focus to a part of the input doc identified by the cell anchor.
 let focusCell (anchor:CellAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
-    getCell anchor >>>= fun cell ->
-    let region = extractRegion cell.Range 
-    focus region ma
+    focusM (getCell anchor |>>> fun cell -> extractRegion cell.Range)  ma
+
+/// Version of focusCell that binds the anchor returned from a query.
+let focusCellM (cellQuery:DocSoup<CellAnchor>) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    cellQuery >>>= fun anchor -> focusCell anchor ma
+
+
+/// Assert the supplied table anchor is in focus.
+let assertTableInFocus (anchor:TableAnchor) : DocSoup<unit> = 
+    getTable anchor >>>= fun table -> 
+    assertInFocus (extractRegion table.Range)  
+    
+/// Assert the supplied cell anchor is in focus.
+let assertCellInFocus (anchor:CellAnchor) : DocSoup<unit> = 
+    getCell anchor >>>= fun cell -> 
+    assertInFocus (extractRegion cell.Range)
 
 
 // *************************************
@@ -415,6 +440,18 @@ let getText : DocSoup<string> =
     DocSoup <| fun doc focus -> 
         let text = regionText focus doc 
         Ok <| text.Trim ()
+
+
+/// This gets all the text for the table indentified by the anchor.
+/// The table must be withing the current focus.
+let getTableText (anchor:TableAnchor) : DocSoup<string> =
+    getTable anchor >>>= fun table -> focus (extractRegion table.Range) getText
+
+
+/// This gets the text for the cell indentified by the anchor.
+/// The cell must be withing the current focus.
+let getCellText (anchor:CellAnchor) : DocSoup<string> =
+    getCell anchor >>>= fun cell -> focus (extractRegion cell.Range) getText
 
 
 
@@ -457,18 +494,7 @@ let findPatternMany (search:string) : DocSoup<Region list> =
 
 
 
-//let private getTablesInFocus : DocSoup<TableAnchor list> = 
-//    DocSoup <| fun doc focus -> 
-//        try 
-//            let testInFocus (ix:TableAnchor) = 
-//                isSubregionOf focus (extractRegion <| doc.Range().Tables.Item(ix.TableIndex).Range)
-//            let indexes = 
-//                List.map (fun ix -> {TableIndex = ix }) [ 1 .. doc.Range().Tables.Count ]     // 1-indexed
-//            Ok << List.filter testInFocus <| indexes
-//        with
-//        | _ -> Err "getTablesInFocus" 
-
-
+/// Return the table containing needle.
 let containingTable (needle:Region) : DocSoup<TableAnchor> = 
     DocSoup <| fun doc focus -> 
         let rec work (ix:TableAnchor) = 
@@ -486,21 +512,9 @@ let containingTable (needle:Region) : DocSoup<TableAnchor> =
                 Err "containingTable - needle not in focus"
         with
         | _ -> Err "containingTable - error"
-    
-        
-        
 
-/// If successful returns the concatenation of all regions.
-let findAll (searches:string list) (matchCase:bool) : DocSoup<Region> =
-    mapM (fun s -> findText s matchCase) searches >>>= fun xs ->
-    optionToAction (regionConcat xs) "findAll - fail" 
 
-/// If successful returns the concatenation of all regions.
-let findPatternAll (searches:string list) : DocSoup<Region> =
-    mapM findPattern searches >>>= fun xs ->
-    optionToAction (regionConcat xs) "findAllPattern - fail" 
-    
-
+/// Return the cell containing needle.
 let containingCell (needle:Region) : DocSoup<CellAnchor> = 
     let testCell (cell:Word.Cell) : bool = 
             isSubregionOf (extractRegion cell.Range) needle
@@ -515,15 +529,63 @@ let containingCell (needle:Region) : DocSoup<CellAnchor> =
         | None -> throwError "containingCell - no match" |> ignore
         }
 
-        
-let cellText (anchor:CellAnchor) : DocSoup<string> =
-    getCell anchor >>>= fun containing -> focus (extractRegion containing.Range) getText
-
-let tableText (anchor:TableAnchor) : DocSoup<string> =
-    getTable anchor >>>= fun containing -> focus (extractRegion containing.Range) getText
+    
+/// Get the tableHeader region.        
+let tableHeader (anchor:TableAnchor) : DocSoup<Region> = 
+    getCell (firstCell anchor) |>>> fun (cell:Word.Cell) -> extractRegion cell.Range
 
 
 
+// *************************************
+// Navigation using anchors
+
+// Get the table containing the supplied cell.
+let parentTable (cell:CellAnchor) : DocSoup<TableAnchor> = 
+    (assertTableInFocus cell.TableAnchor >>>. sreturn cell.TableAnchor) <&?> "parentTable - failed"
+
+// Get the next table, will fail if next table is not in focus
+let nextTable (anchor:TableAnchor) : DocSoup<TableAnchor> = 
+    (assertTableInFocus anchor.Next >>>. sreturn anchor.Next) <&?> "nextTable - failed" 
+
+
+let cellLeft (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with ColumnIx = cell.ColumnIx - 1} 
+    (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellLeft - failed" 
+
+
+let cellRight (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with ColumnIx = cell.ColumnIx + 1} 
+    (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellRight - failed" 
+
+let cellBelow (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with RowIx = cell.RowIx + 1} 
+    (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellBelow - failed" 
+
+let cellAbove (cell:CellAnchor) : DocSoup<CellAnchor> = 
+    let c1 = { cell with RowIx = cell.RowIx - 1} 
+    (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellAbove - failed" 
+
+
+// *************************************
+// Bad API for finding tables...
+// Needs re-thinking.
+
+
+/// If successful returns the concatenation of all regions.
+/// This is a bad API, should be at least private and maybe deleted.
+let private findAll (searches:string list) (matchCase:bool) : DocSoup<Region> =
+    mapM (fun s -> findText s matchCase) searches >>>= fun xs ->
+    optionToAction (regionConcat xs) "findAll - fail" 
+
+/// If successful returns the concatenation of all regions.
+/// This is a bad API, should be at least private and maybe deleted.
+let private findPatternAll (searches:string list) : DocSoup<Region> =
+    mapM findPattern searches >>>= fun xs ->
+    optionToAction (regionConcat xs) "findAllPattern - fail" 
+    
+
+
+/// Possible findCell should be supplied with a tableAnchor to speed it up
 
 let findCell (search:string) (matchCase:bool) : DocSoup<CellAnchor> =
     findTextMany search matchCase >>>= findSuccessM containingCell
@@ -542,8 +604,11 @@ let findCellsPattern (search:string) : DocSoup<CellAnchor list> =
 
 /// Finds first table containing search text.
 /// If a match is found in "water" before a table, we continue the search.
+/// Bad API - wrong (misleading) name
 let findTable (search:string) (matchCase:bool) : DocSoup<TableAnchor> =
     findTextMany search matchCase >>>= findSuccessM containingTable
+
+
 
 /// Finds first table containing a match.
 /// If a match is found in "water" before a table, we continue the search.
@@ -629,32 +694,6 @@ let findTablesPatternAll (searches:string list) : DocSoup<TableAnchor list> =
         work ss [] tables
 
 
-let assertCellInFocus (anchor:CellAnchor) : DocSoup<unit> = 
-    getCell anchor >>>= fun cell -> 
-    assertInFocus (extractRegion cell.Range)
- 
-let assertTableInFocus (anchor:TableAnchor) : DocSoup<unit> = 
-    getTable anchor >>>= fun table -> 
-    assertInFocus (extractRegion table.Range)   
 
 
-let parentTable (cell:CellAnchor) : DocSoup<TableAnchor> = 
-    sreturn cell.TableAnchor
-
-let cellLeft (cell:CellAnchor) : DocSoup<CellAnchor> = 
-    let c1 = { cell with ColumnIx = cell.ColumnIx - 1} 
-    assertCellInFocus c1 >>>. sreturn c1
-
-
-let cellRight (cell:CellAnchor) : DocSoup<CellAnchor> = 
-    let c1 = { cell with ColumnIx = cell.ColumnIx + 1} 
-    assertCellInFocus c1 >>>. sreturn c1
-
-let cellBelow (cell:CellAnchor) : DocSoup<CellAnchor> = 
-    let c1 = { cell with RowIx = cell.RowIx + 1} 
-    assertCellInFocus c1 >>>. sreturn c1
-
-let cellAbove (cell:CellAnchor) : DocSoup<CellAnchor> = 
-    let c1 = { cell with RowIx = cell.RowIx - 1} 
-    assertCellInFocus c1 >>>. sreturn c1
 
