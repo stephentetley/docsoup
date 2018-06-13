@@ -307,6 +307,11 @@ let runOnFileE (ma:DocSoup<'a>) (fileName:string) : 'a =
     | Err msg -> failwith msg
     | Ok a -> a
 
+
+
+// *************************************
+// String level parsing with FParsec
+
 // We expect string level parsers might fail. 
 // Use this with caution or use execFParsecFallback.
 let execFParsec (parser:Parser<'a, unit>) : DocSoup<'a> = 
@@ -331,6 +336,9 @@ let execFParsecFallback (parser:Parser<'a, unit>) : DocSoup<FParsecFallback<'a>>
         | Failure(msg,_,_) -> Ok <| FallbackText text
 
 
+// *************************************
+// Errors
+
 let throwError (msg:string) : DocSoup<'a> = 
     DocSoup <| fun _  _ -> Err msg
 
@@ -345,17 +353,82 @@ let (<&?>) (ma:DocSoup<'a>) (msg:string) : DocSoup<'a> = swapError msg ma
 let (<?&>) (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> = swapError msg ma
 
 
+// *************************************
+// Restricting focus to a part of the input doc.
+
 let focus (region:Region) (ma:DocSoup<'a>) : DocSoup<'a> = 
     DocSoup <| fun doc _ -> apply1 ma doc region
 
+/// Version of focus that binds the region returned from a query to limit 
+/// let focus.
+let focusM (regionQuery:DocSoup<Region>) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    regionQuery >>>= fun region -> focus region ma
 
-/// This gets the text within the current focus!        
+/// Assert the supplied region is in focus.
+let assertInFocus (region:Region) : DocSoup<unit> = 
+    DocSoup <| fun doc focus -> 
+        if isSubregionOf focus region then
+            Ok ()
+        else
+            Err "assertInFocus - outside focus"
+
+
+let private getTablesInFocus : DocSoup<Word.Table []> = 
+    DocSoup <| fun doc focus -> 
+        try 
+            // O
+            let focusTables : Word.Table [] = 
+                doc.Range(Start = rbox focus.RegionStart, End = rbox focus.RegionEnd ).Tables |> Seq.cast<Word.Table> |> Seq.toArray
+            Ok <| focusTables
+        with
+        | _ -> Err "getTablesInFocus"
+
+/// This interprets TableAnchor as local to the focus and 0-indexed.
+/// We could have an alternative implementation (potentially faster)
+/// that uses Word's internal 1-indexed table index and checks that the 
+/// table is in range (after retreiving it).
+let private getTable (anchor:TableAnchor) : DocSoup<Word.Table> = 
+    getTablesInFocus >>>= fun arr -> 
+    try
+        let ix = getTableIndex anchor
+        sreturn arr.[ix]
+    with
+    | _ -> throwError "getTable error (index out-of-range?)"
+
+let private getCell (anchor:CellAnchor) : DocSoup<Word.Cell> = 
+    getTable (anchor.TableIndex) >>>= fun table ->
+    try
+        sreturn <| table.Cell(anchor.RowIndex, anchor.ColumnIndex)
+    with
+    | _ -> throwError "getCell error (index out-of-range?)"
+
+
+
+let focusTable (anchor:TableAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    getTable anchor >>>= fun table ->
+    let region = extractRegion table.Range 
+    focus region ma
+
+
+let focusCell (anchor:CellAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    getCell anchor >>>= fun cell ->
+    let region = extractRegion cell.Range 
+    focus region ma
+
+
+// *************************************
+// Retrieve input
+
+/// This gets the text within the current focus.     
 let getText : DocSoup<string> =
     DocSoup <| fun doc focus -> 
         let text = regionText focus doc 
         Ok <| text.Trim ()
 
 
+
+// *************************************
+// Search text for "anchors"
 
 let findText (search:string) (matchCase:bool) : DocSoup<Region> =
     DocSoup <| fun doc focus  -> 
@@ -429,15 +502,6 @@ let findPatternAll (searches:string list) : DocSoup<Region> =
     optionToAction (regionConcat xs) "findAllPattern - fail" 
 
 
-let private getTablesInFocus : DocSoup<Word.Table []> = 
-    DocSoup <| fun doc focus -> 
-        try 
-            // O
-            let focusTables : Word.Table [] = 
-                doc.Range(Start = rbox focus.RegionStart, End = rbox focus.RegionEnd ).Tables |> Seq.cast<Word.Table> |> Seq.toArray
-            Ok <| focusTables
-        with
-        | _ -> Err "getTablesInFocus"
 
 
 /// Note - the results will be within the current focus!
@@ -491,20 +555,6 @@ let containingCell (needle:Region) : DocSoup<CellAnchor> =
     | Some cid -> sreturn cid
     | None -> throwError "containingCell"
 
-let private getTable (anchor:TableAnchor) : DocSoup<Word.Table> = 
-    getTablesInFocus >>>= fun arr -> 
-    try
-        let ix = getTableIndex anchor
-        sreturn arr.[ix]
-    with
-    | _ -> throwError "getTable error (index out-of-range?)"
-
-let private getCell (anchor:CellAnchor) : DocSoup<Word.Cell> = 
-    getTable (anchor.TableIndex) >>>= fun table ->
-    try
-        sreturn <| table.Cell(anchor.RowIndex, anchor.ColumnIndex)
-    with
-    | _ -> throwError "getCell error (index out-of-range?)"
 
         
 let cellText (anchor:CellAnchor) : DocSoup<string> =
@@ -514,16 +564,6 @@ let tableText (anchor:TableAnchor) : DocSoup<string> =
     getTable anchor >>>= fun containing -> focus (extractRegion containing.Range) getText
 
 
-let focusTable (anchor:TableAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
-    getTable anchor >>>= fun table ->
-    let region = extractRegion table.Range 
-    focus region ma
-
-
-let focusCell (anchor:CellAnchor) (ma:DocSoup<'a>) : DocSoup<'a> = 
-    getCell anchor >>>= fun cell ->
-    let region = extractRegion cell.Range 
-    focus region ma
 
 
 let findCell (search:string) (matchCase:bool) : DocSoup<CellAnchor> =
@@ -629,12 +669,6 @@ let findTablesPatternAll (searches:string list) : DocSoup<TableAnchor list> =
         findTablesPattern s >>>= fun tables -> 
         work ss [] tables
 
-let assertInFocus (region:Region) : DocSoup<unit> = 
-    DocSoup <| fun doc focus -> 
-        if isSubregionOf focus region then
-            Ok ()
-        else
-            Err "assertInFocus - outside focus"
 
 let assertCellInFocus (anchor:CellAnchor) : DocSoup<unit> = 
     getCell anchor >>>= fun cell -> 

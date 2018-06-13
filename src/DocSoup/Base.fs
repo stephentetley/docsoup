@@ -84,11 +84,12 @@ let tryFindCell (predicate:Word.Cell -> bool) (table:Word.Table) : option<Word.C
 
 
 [<Struct>]
-type TableAnchor = TableAnchor of int
+type TableAnchor = internal TableAnchor of int
 let internal getTableIndex (anchor:TableAnchor) : int = 
     match anchor with | TableAnchor ix -> ix
 
 type CellAnchor = 
-    { TableIndex: TableAnchor
-      RowIndex: int
-      ColumnIndex: int }
+    internal 
+        { TableIndex: TableAnchor
+          RowIndex: int
+          ColumnIndex: int }
