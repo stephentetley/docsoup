@@ -83,13 +83,19 @@ let tryFindCell (predicate:Word.Cell -> bool) (table:Word.Table) : option<Word.C
 
 
 
-[<Struct>]
-type TableAnchor = internal TableAnchor of int
-let internal getTableIndex (anchor:TableAnchor) : int = 
-    match anchor with | TableAnchor ix -> ix
+/// Design note - the Word automation API provides a table ``ID`` but it 
+/// cannot be used on for lookup.
+type TableAnchor = 
+    internal 
+        { TableIndex: int }
+    member internal x.Index = x.TableIndex
+
 
 type CellAnchor = 
     internal 
-        { TableIndex: TableAnchor
-          RowIndex: int
-          ColumnIndex: int }
+        { TableIx: TableAnchor
+          RowIx: int
+          ColumnIx: int }
+    member internal x.TableAnchor : TableAnchor = x.TableIx
+    member internal x.Row : int = x.RowIx
+    member internal x.Column : int = x.ColumnIx

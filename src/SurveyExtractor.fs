@@ -304,16 +304,19 @@ let appendixText : DocSoup<string> =
         findCell "Appendix" false >>>= cellBelow >>>= cellText
     findTable "Appendix"  true >>>= fun anchor -> focusTable anchor parser1
 
+let cw (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> = 
+    printfn "%s" msg; ma
+
 let parseSurvey : DocSoup<Survey> = 
     docSoup { 
-        let! site           = extractSiteDetails
-        let! surveyInfo     = extractSurveyInfo
-        let! outstation     = extractOutstationInfo
-        let! ultrasonics    = extractUltrasonicInfos
-        let! chambers       = extractChamberInfos
-        let! outfalls       = extractOutfallInfos
-        let! scope          = scopeOfWorks <||> sreturn ""
-        let! appendix       = appendixText <||> sreturn ""
+        let! site           = cw "site"             extractSiteDetails
+        let! surveyInfo     = cw "surveyInfo"       extractSurveyInfo
+        let! outstation     = cw "outstation"       extractOutstationInfo
+        let! ultrasonics    = cw "ultrasonics"      extractUltrasonicInfos
+        let! chambers       = cw "chambers"         extractChamberInfos
+        let! outfalls       = cw "outfalls"         extractOutfallInfos
+        let! scope          = cw "scope"            (scopeOfWorks <||> sreturn "")
+        let! appendix       = cw "appendix"         (appendixText <||> sreturn "")
         return { 
             SiteDetails = site
             SurveyInfo = surveyInfo
