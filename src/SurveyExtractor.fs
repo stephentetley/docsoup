@@ -133,15 +133,15 @@ let sw (msg:string) (ma:DocSoup<'focus,'a>) : DocSoup<'focus,'a> =
 
 /// Returns "" if no cell matches the search.
 let getFieldValue (search:string) (matchCase:bool) : TableExtractor<string> = 
-    sreturn ""
-    //let good = findCell search matchCase >>>= cellRight >>>= getText ()
-    //good <||> sreturn ""
+    let good = 
+        focusCellM (findCell search matchCase >>>= cellRight) <| getCellText
+    good <||> sreturn ""
 
 /// Returns "" if no cell matches the search.
 let getFieldValuePattern (search:string) : TableExtractor<string> = 
-    sreturn ""
-    //let good = findCellPattern search >>>= cellRight >>>= getCellText
-    //good <||> sreturn ""
+    let good = 
+        focusCellM (findCellPattern search >>>= cellRight) <| getCellText
+    good <||> sreturn ""
 
 type MultiTableParser<'answer> = 
     { GetAnchors: DocExtractor<TableAnchor list>

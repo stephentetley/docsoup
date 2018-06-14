@@ -686,24 +686,24 @@ let parentTable (cell:CellAnchor) : DocSoup<'focus,TableAnchor> =
 
 
 /// Get the next table, will fail if next table is not in focus
-let nextTable (anchor:TableAnchor) : DocSoup<'focus,TableAnchor> = 
+let nextTable (anchor:TableAnchor) : DocExtractor<TableAnchor> = 
     (assertTableInFocus anchor.Next >>>. sreturn anchor.Next) <&?> "nextTable - failed" 
 
-/// should be : TableExtractor<CellAnchor>... 
-let cellLeft (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
+
+let cellLeft (cell:CellAnchor) : TableExtractor<CellAnchor> = 
     let c1 = { cell with CellIx = cell.CellIx.DecrCol } 
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellLeft - failed" 
 
 
-let cellRight (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
+let cellRight (cell:CellAnchor) : TableExtractor<CellAnchor> = 
     let c1 = { cell with CellIx = cell.CellIx.IncrCol } 
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellRight - failed" 
 
-let cellBelow (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
+let cellBelow (cell:CellAnchor) : TableExtractor<CellAnchor> = 
     let c1 =  { cell with CellIx = cell.CellIx.IncrRow } 
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellBelow - failed" 
 
-let cellAbove (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
+let cellAbove (cell:CellAnchor) : TableExtractor<CellAnchor> = 
     let c1 =  { cell with CellIx = cell.CellIx.DecrRow }  
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellAbove - failed" 
 
