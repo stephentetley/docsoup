@@ -15,6 +15,7 @@ open Microsoft.Office.Interop
 let rbox (v : 'a) : obj ref = ref (box v)
 
 
+let cleanRangeText (range:Word.Range) : string = Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
 
 // StringReader appears to be the best way of doing this. 
 // Trying to split on a character (or character combo e.g. "\r\n") seems unreliable.
@@ -42,8 +43,10 @@ let isSubregionOf (haystack:Region) (needle:Region) : bool =
     needle.RegionStart >= haystack.RegionStart && needle.RegionEnd <= haystack.RegionEnd
 
 let regionText (focus:Region) (doc:Word.Document) : string = 
-    let range = doc.Range(rbox <| focus.RegionStart, rbox <| focus.RegionEnd)
-    Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
+    let fStart = focus.RegionStart
+    let fEnd = focus.RegionEnd
+    cleanRangeText <| doc.Range(rbox fStart, rbox fEnd)
+    
 
 let regionPlus (r1:Region) (r2:Region) : Region = 
     { RegionStart = min r1.RegionStart r2.RegionStart
@@ -93,6 +96,13 @@ type TableAnchor =
     member internal x.Next = { TableIndex = x.TableIndex + 1 }
 
 
+let internal getTable (anchor:TableAnchor) (doc:Word.Document) : option<Word.Table> = 
+    try
+        Some <| doc.Range().Tables.Item(anchor.Index)
+    with
+    | _ -> None 
+
+
 type CellAnchor = 
     internal 
         { TableIx: TableAnchor
@@ -101,6 +111,15 @@ type CellAnchor =
     member internal x.TableAnchor : TableAnchor = x.TableIx
     member internal x.Row : int = x.RowIx
     member internal x.Column : int = x.ColumnIx
+
+
+let internal getCell (anchor:CellAnchor) (doc:Word.Document) : option<Word.Cell> = 
+    try
+        let table : Word.Table = doc.Range().Tables.Item(anchor.TableAnchor.Index)
+        let cell : Word.Cell = table.Cell(anchor.Row, anchor.Column)
+        Some cell
+    with
+    | _ -> None 
 
 let internal firstCell (table:TableAnchor)  = 
     { TableIx = table; RowIx = 1; ColumnIx = 1 }
