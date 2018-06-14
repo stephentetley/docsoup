@@ -455,6 +455,15 @@ let (<?&>) (msg:string) (ma:DocSoup<'focus,'a>) : DocSoup<'focus,'a> =
 // *************************************
 // Control focus
 
+let askDocFocus : DocExtractor<DocumentAnchor> = 
+    DocSoup <| fun _ _ focus -> Ok focus
+
+let askTableFocus : TableExtractor<TableAnchor> = 
+    DocSoup <| fun _ _ focus -> Ok focus
+
+let askCellFocus : CellExtractor<CellAnchor> = 
+    DocSoup <| fun _ _ focus -> Ok focus
+
 
 /// Restrict focus to a part of the input doc identified by region.
 /// Focus type stays the same
@@ -574,7 +583,7 @@ let getTableText : TableExtractor<string> = getText ()
 
 
 /// This gets the text for the cell under current focus.
-let getCellText : TableExtractor<string> = getText ()
+let getCellText : CellExtractor<string> = getText ()
 
 
 
@@ -636,7 +645,7 @@ let containingTable (needle:Region) : DocSoup<'focus,TableAnchor> =
         | None -> Err "containingTable"
         | Some focus1 ->
             if isSubregionOf focus1 needle then
-                work TableAnchor.Zero
+                work TableAnchor.First
             else
                 Err "containingTable - needle not in focus"
 
@@ -649,10 +658,11 @@ let containingCell (needle:Region) : DocSoup<'focus,CellAnchor> =
         let! tableAnchor = containingTable needle
         let! table = getTable tableAnchor
         match tryFindCell testCell table with 
-        | Some cell -> return { 
-                            TableIx = tableAnchor;
-                            RowIx = cell.RowIndex;
-                            ColumnIx = cell.ColumnIndex }
+        | Some cell -> 
+            return { 
+                TableIx = tableAnchor;
+                CellIx = { RowIx = cell.RowIndex; ColumnIx = cell.ColumnIndex }
+            }
         | None -> throwError "containingCell - no match" |> ignore
         }
 
@@ -664,32 +674,37 @@ let tableHeader (anchor:TableAnchor) : DocSoup<'focus,Region> =
 
 
 // *************************************
-// Navigation using anchors
+// Navigation
 
-// Get the table containing the supplied cell.
+let getCellByIndex (cellIx:CellIndex) : TableExtractor<CellAnchor> = 
+    askTableFocus |>>> fun tix -> { TableIx = tix; CellIx = cellIx }
+
+/// Get the table containing the supplied cell.
 let parentTable (cell:CellAnchor) : DocSoup<'focus,TableAnchor> = 
     (assertTableInFocus cell.TableAnchor >>>. sreturn cell.TableAnchor) <&?> "parentTable - failed"
 
-// Get the next table, will fail if next table is not in focus
+
+
+/// Get the next table, will fail if next table is not in focus
 let nextTable (anchor:TableAnchor) : DocSoup<'focus,TableAnchor> = 
     (assertTableInFocus anchor.Next >>>. sreturn anchor.Next) <&?> "nextTable - failed" 
 
-
+/// should be : TableExtractor<CellAnchor>... 
 let cellLeft (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
-    let c1 = { cell with ColumnIx = cell.ColumnIx - 1} 
+    let c1 = { cell with CellIx = cell.CellIx.DecrCol } 
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellLeft - failed" 
 
 
 let cellRight (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
-    let c1 = { cell with ColumnIx = cell.ColumnIx + 1} 
+    let c1 = { cell with CellIx = cell.CellIx.IncrCol } 
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellRight - failed" 
 
 let cellBelow (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
-    let c1 = { cell with RowIx = cell.RowIx + 1} 
+    let c1 =  { cell with CellIx = cell.CellIx.IncrRow } 
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellBelow - failed" 
 
 let cellAbove (cell:CellAnchor) : DocSoup<'focus,CellAnchor> = 
-    let c1 = { cell with RowIx = cell.RowIx - 1} 
+    let c1 =  { cell with CellIx = cell.CellIx.DecrRow }  
     (assertCellInFocus c1 >>>. sreturn c1) <&?> "cellAbove - failed" 
 
 

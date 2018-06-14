@@ -319,15 +319,16 @@ let extractOutfallInfos : DocExtractor<OutfallInfo list>=
           TestNotEmpty = fun (info:OutfallInfo) -> not info.isEmpty }
     parseMultipleTables dict <&?> "OutfallInfos"
 
+/// Single table - Title (1,1) = "Scope of Works", data in cell (r3,c1):
 let scopeOfWorks : DocExtractor<string> = 
-    focusTableM (findTable "Scope of Works" true) <| 
-        // findCell "Scope of Works" false >>>= cellBelow >>>= cellBelow >>>= getCellText
-        sreturn ""
+    focusTableM (findTable "Scope of Works" true) <<
+        focusCellM (getCellByIndex { RowIx = 3; ColumnIx = 1 }) <| getCellText
 
+/// Single table - Title (1,1) = "Appendix", data in cell (r2,c1):
 let appendixText : DocExtractor<string> =         
-    focusTableM (findTable "Appendix" true) <|
-        // findCell "Appendix" false >>>= cellBelow >>>= getCellText
-        sreturn ""
+    focusTableM (findTable "Appendix..." true) <<
+        focusCellM (getCellByIndex { RowIx = 2; ColumnIx = 1 }) <| getCellText
+     
 
 
 let parseSurvey : DocExtractor<Survey> = 

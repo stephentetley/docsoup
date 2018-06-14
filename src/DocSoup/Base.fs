@@ -59,15 +59,16 @@ let regionConcat (regions:Region list) : Region option =
 
 
 // cells
-let internal softCell (table:Word.Table) (row:int) (col:int) : option<Word.Cell> = 
-    try 
-        Some <| table.Cell(row, col)
-    with
-    | _ -> None
+
 
 let tryFindCell (predicate:Word.Cell -> bool) (table:Word.Table) : option<Word.Cell> = 
     let rowMax = table.Rows.Count 
     let colMax = table.Columns.Count
+    let softCell (table:Word.Table) (row:int) (col:int) : option<Word.Cell> = 
+        try 
+            Some <| table.Cell(row, col)
+        with
+        | _ -> None
 
     let rec work (row:int) (col:int) : option<Word.Cell> = 
         if row >= rowMax then 
@@ -91,7 +92,10 @@ let tryFindCell (predicate:Word.Cell -> bool) (table:Word.Table) : option<Word.C
 type TableAnchor = 
     internal 
         { TableIndex: int }
-    static member internal Zero = { TableIndex = 1 }
+
+    /// Because tables are 1-indexed in word the default constructor is called 
+    /// ``First`` rather than ``Zero``.
+    static member internal First = { TableIndex = 1 }
     member internal x.Index = x.TableIndex
     member internal x.Next = { TableIndex = x.TableIndex + 1 }
 
@@ -103,14 +107,26 @@ let internal getTable (anchor:TableAnchor) (doc:Word.Document) : option<Word.Tab
     | _ -> None 
 
 
+/// Fully user visible
+type CellIndex = 
+    { RowIx: int
+      ColumnIx : int }
+
+    /// Because tables are 1-indexed in word the default constructor is called 
+    /// ``First`` rather than ``Zero``.
+    static member internal First = { RowIx = 1; ColumnIx = 1 }
+    member v.IncrRow = { v with RowIx = v.RowIx + 1 }
+    member v.DecrRow = { v with RowIx = v.RowIx - 1 }
+    member v.IncrCol = { v with ColumnIx = v.ColumnIx + 1 }
+    member v.DecrCol = { v with ColumnIx = v.ColumnIx - 1 }
+
 type CellAnchor = 
     internal 
         { TableIx: TableAnchor
-          RowIx: int
-          ColumnIx: int }
+          CellIx: CellIndex }
     member internal x.TableAnchor : TableAnchor = x.TableIx
-    member internal x.Row : int = x.RowIx
-    member internal x.Column : int = x.ColumnIx
+    member internal x.Row : int = x.CellIx.RowIx
+    member internal x.Column : int = x.CellIx.ColumnIx
 
 
 let internal getCell (anchor:CellAnchor) (doc:Word.Document) : option<Word.Cell> = 
@@ -122,7 +138,7 @@ let internal getCell (anchor:CellAnchor) (doc:Word.Document) : option<Word.Cell>
     | _ -> None 
 
 let internal firstCell (table:TableAnchor)  = 
-    { TableIx = table; RowIx = 1; ColumnIx = 1 }
+    { TableIx = table; CellIx = CellIndex.First }
     
 
 /// Word: Range.Find
