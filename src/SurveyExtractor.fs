@@ -17,7 +17,8 @@ open System.IO
 // Word surveys are very "free texty" and there is no guarantee the input data 
 // follows any format.
 
-
+// *************************************
+// Syntax tree
 
 type SiteInfo = 
     { SiteName: string
@@ -112,7 +113,23 @@ type Survey =
       ScopeOfWorks: string 
       AppendixText: string }
 
-/// Utility parsers
+// *************************************
+// Helpers
+
+let sw (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> =
+    docSoup { 
+        let stopWatch = System.Diagnostics.Stopwatch.StartNew()
+        do printfn "%s" msg
+        let! ans = ma
+        do stopWatch.Stop()
+        do printfn "... time(ms) %d" stopWatch.ElapsedMilliseconds
+        return ans
+        }
+
+
+
+// *************************************
+// Utility parsers
 
 /// Returns "" if no cell matches the search.
 let getFieldValue (search:string) (matchCase:bool) : DocSoup<string> = 
@@ -136,10 +153,13 @@ let parseMultipleTables (dict:MultiTableParser<'answer>) : DocSoup<'answer list>
         return (List.filter dict.TestNotEmpty allAnswers)
     } <&?> "parseMultipleTables"
 
-/// Survey parsers
+
+
+// *************************************
+// Survey parsers
 
 let extractSiteDetails : DocSoup<SiteInfo> = 
-    let parser1 = 
+    focusTableM (findTable "Site Details" true) <| 
         docSoup { 
             let! sname          = getFieldValue "Site Name" false
             let! uid            = getFieldValue "SAI Number" false
@@ -152,10 +172,10 @@ let extractSiteDetails : DocSoup<SiteInfo> =
                 ReceivingWatercourse = watercourse
                 }
         }
-    focusTableM (findTable "Site Details" true) parser1
+
 
 let extractSurveyInfo : DocSoup<SurveyInfo> = 
-    let parser1 =
+    focusTableM (findTable "Site Details" true) <| 
         docSoup { 
             let! name       = getFieldValue "Engineer Name" false
             let! sdate      = getFieldValue "Date of Survey" false
@@ -164,8 +184,6 @@ let extractSurveyInfo : DocSoup<SurveyInfo> =
                 SurveyDate = sdate
             }
         }
-    focusTableM (findTable "Site Details" true) parser1
-
 
 
 let extractOutstationInfo : DocSoup<OutstationInfo option> = 
@@ -202,33 +220,36 @@ let extractRelay (relayNumber:int) : DocSoup<RelaySetting> =
             OffSetPoint = offSetPt 
             }
         }
+
+
 let extractRelays : DocSoup<RelaySetting list> = 
     mapM extractRelay [1..6] |>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
 let extractUltrasonicInfo1 (anchor:TableAnchor) : DocSoup<UltrasonicInfo> = 
-    let makeInfo (disName:string) (procName:string) (manu:string) 
-                    (model:string) (snumber:string) (piTag:string)
-                    (emptyDist:string) (span:string) 
-                    (relays:RelaySetting list) : UltrasonicInfo  = 
-        { MonitoredDischarge = disName;
-          ProcessOrFacilityName = procName;
-          Manufacturer = manu;
-          Model = model;
-          SerialNumber = snumber;
-          PITag = piTag;
-          EmptyDistance = emptyDist;
-          Span = span;
-          Relays = relays}
     focusTable anchor <| 
-        (makeInfo   <&&> (getFieldValue "Discharge Being Monitored" false)
-                    <**> (getFieldValue "Process or Facility" false)
-                    <**> (getFieldValue "Manufacturer" false)
-                    <**> (getFieldValue "Model" false)
-                    <**> (getFieldValue "Serial Number" false)
-                    <**> (getFieldValue "P & I Tag" false)
-                    <**> (getFieldValue "Empty Distance" false)
-                    <**> (getFieldValue "Span" false)
-                    <**> extractRelays )
+        docSoup {
+            let! disName = getFieldValue "Discharge Being Monitored" false
+            let! procName = getFieldValue "Process or Facility" false
+            let! manuf = getFieldValue "Manufacturer" false
+            let! model = getFieldValue "Model" false
+            let! snumber = getFieldValue "Serial Number" false
+            let! piTag = getFieldValue "P & I Tag" false
+            let! emptyDist = getFieldValue "Empty Distance" false
+            let! span = getFieldValue "Span" false
+            let! relays =  extractRelays
+            return { 
+                MonitoredDischarge = disName
+                ProcessOrFacilityName = procName
+                Manufacturer = manuf
+                Model = model
+                SerialNumber = snumber
+                PITag = piTag
+                EmptyDistance = emptyDist
+                Span = span
+                Relays = relays
+            }
+          } 
+
 
 let extractUltrasonicInfos : DocSoup<UltrasonicInfo list>= 
     let dict: MultiTableParser<UltrasonicInfo> = 
@@ -250,24 +271,26 @@ let extractOverflowType (anchor:TableAnchor) : DocSoup<OverflowType> =
 // Note - applicative style parser is not an improvement as we need `makeInfo` 
 // which itself is verbose.
 let extractChamberInfo1 (anchor:TableAnchor) : DocSoup<ChamberInfo> = 
-    let makeInfo (otype:OverflowType) (name:string) (roofDist:string) 
-                    (usDist:string) (ovDist:string) (scDist:string) 
-                    (emDist:string) : ChamberInfo  = 
-        { OverflowType = otype
-          ChamberName = name;
-          RoofToInvert = roofDist;
-          UsFaceToInvert = usDist; 
-          OverflowToInvert = ovDist;
-          ScreenToInvert = scDist; 
-          EmergencyOverflowToInvert = emDist }
     focusTable anchor <| 
-        (makeInfo   <&&>  (extractOverflowType anchor)
-                    <**> (getFieldValue "Chamber Name" false)
-                    <**> (getFieldValue "Roof Slab to Invert" false)
-                    <**> (getFieldValue "Transducer Face to Invert" false)
-                    <**> (getFieldValue "Overflow level to Invert" false)
-                    <**> (getFieldValuePattern "Bottom*Screen*Invert")
-                    <**> (getFieldValuePattern "Emergency*Invert") )
+        docSoup { 
+            let! otype      = extractOverflowType anchor
+            let! name       = getFieldValue "Chamber Name" false
+            let! roofDist   = getFieldValue "Roof Slab to Invert" false
+            let! usDist     = getFieldValue "Transducer Face to Invert" false
+            let! ovDist     = getFieldValue "Overflow level to Invert" false
+            let! scDist     = getFieldValuePattern "Bottom*Screen*Invert"
+            let! emDist     = getFieldValuePattern "Emergency*Invert"
+            return { 
+                OverflowType = otype
+                ChamberName = name
+                RoofToInvert = roofDist
+                UsFaceToInvert = usDist 
+                OverflowToInvert = ovDist
+                ScreenToInvert = scDist
+                EmergencyOverflowToInvert = emDist 
+            }
+        }
+
 
 let extractChamberInfos : DocSoup<ChamberInfo list>= 
     let dict: MultiTableParser<ChamberInfo> = 
@@ -300,35 +323,24 @@ let extractOutfallInfos : DocSoup<OutfallInfo list>=
     parseMultipleTables dict <&?> "OutfallInfos"
 
 let scopeOfWorks : DocSoup<string> = 
-    let parser1 = 
+    focusTableM (findTable "Scope of Works" true) <| 
         findCell "Scope of Works" false >>>= cellBelow >>>= cellBelow >>>= getCellText
-    focusTableM (findTable "Scope of Works" true) parser1
 
-let appendixText : DocSoup<string> = 
-    let parser1 = 
+let appendixText : DocSoup<string> =         
+    focusTableM (findTable "Appendix" true) <|
         findCell "Appendix" false >>>= cellBelow >>>= getCellText
-    focusTableM (findTable "Appendix" true) parser1
 
-let cw (msg:string) (ma:DocSoup<'a>) : DocSoup<'a> =
-    docSoup { 
-        let stopWatch = System.Diagnostics.Stopwatch.StartNew()
-        do printfn "%s" msg
-        let! ans = ma
-        do stopWatch.Stop()
-        do printfn "... time(ms) %d" stopWatch.ElapsedMilliseconds
-        return ans
-        }
 
 let parseSurvey : DocSoup<Survey> = 
     docSoup { 
-        let! site           = cw "site"             extractSiteDetails
-        let! surveyInfo     = cw "surveyInfo"       extractSurveyInfo
-        let! outstation     = cw "outstation"       extractOutstationInfo
-        let! ultrasonics    = cw "ultrasonics"      extractUltrasonicInfos
-        let! chambers       = cw "chambers"         extractChamberInfos
-        let! outfalls       = cw "outfalls"         extractOutfallInfos
-        let! scope          = cw "scope"            (scopeOfWorks <||> sreturn "")
-        let! appendix       = cw "appendix"         (appendixText <||> sreturn "")
+        let! site           = sw "site"             extractSiteDetails
+        let! surveyInfo     = sw "surveyInfo"       extractSurveyInfo
+        let! outstation     = sw "outstation"       extractOutstationInfo
+        let! ultrasonics    = sw "ultrasonics"      extractUltrasonicInfos
+        let! chambers       = sw "chambers"         extractChamberInfos
+        let! outfalls       = sw "outfalls"         extractOutfallInfos
+        let! scope          = sw "scope"            (scopeOfWorks <||> sreturn "")
+        let! appendix       = sw "appendix"         (appendixText <||> sreturn "")
         return { 
             SiteDetails = site
             SurveyInfo = surveyInfo

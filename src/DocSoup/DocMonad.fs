@@ -221,18 +221,32 @@ let forM (source:'a list) (p: 'a -> DocSoup<'b>) : DocSoup<'b list> = mapM p sou
 
 
 
-/// A version of findM that finds the first success
-/// This allows type changing.
-let findSuccessM  (action: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b> = 
+/// The action is expected to return ``true`` or `false``- if it throws 
+/// an error then the error is passed upwards.
+let findM  (action: 'a -> DocSoup<bool>) (source:'a list) : DocSoup<'a> = 
     DocSoup <| fun doc focus -> 
         let rec work ys = 
             match ys with
-            | [] -> Err "findSuccessM - not found"
+            | [] -> Err "findM - not found"
             | z :: zs -> 
                 match apply1 (action z) doc focus with
-                | Err _ -> work zs
-                | Ok ans -> Ok ans
+                | Err msg -> Err msg
+                | Ok ans -> if ans then Ok z else work zs
         work source
+
+/// The action is expected to return ``true`` or `false``- if it throws 
+/// an error then the error is passed upwards.
+let tryFindM  (action: 'a -> DocSoup<bool>) (source:'a list) : DocSoup<'a option> = 
+    DocSoup <| fun doc focus -> 
+        let rec work ys = 
+            match ys with
+            | [] -> Ok None
+            | z :: zs -> 
+                match apply1 (action z) doc focus with
+                | Err msg -> Err msg
+                | Ok ans -> if ans then Ok (Some z) else work zs
+        work source
+
 
 let findSuccessesM  (action: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b list> = 
     DocSoup <| fun doc focus -> 
@@ -246,12 +260,15 @@ let findSuccessesM  (action: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b li
         work [] source
 
     
-let optionToAction (source:option<'a>) (errMsg:string) : DocSoup<'a> = 
-    DocSoup <| fun _ _ -> 
-        match source with
-        | None -> Err errMsg
-        | Some a -> Ok a
+let optionToFailure (ma:DocSoup<option<'a>>) (errMsg:string) : DocSoup<'a> = 
+    DocSoup <| fun doc focus ->
+        match apply1 ma doc focus with
+        | Err msg -> Err msg
+        | Ok None -> Err errMsg
+        | Ok (Some a) -> Ok a
 
+
+/// Captures errors thrown by the parser 
 let optional (ma:DocSoup<'a>) : DocSoup<'a option> = 
     DocSoup <| fun doc focus ->
         match apply1 ma doc focus with
@@ -575,14 +592,30 @@ let cellAbove (cell:CellAnchor) : DocSoup<CellAnchor> =
 /// This is a bad API, should be at least private and maybe deleted.
 let private findAll (searches:string list) (matchCase:bool) : DocSoup<Region> =
     mapM (fun s -> findText s matchCase) searches >>>= fun xs ->
-    optionToAction (regionConcat xs) "findAll - fail" 
+    optionToFailure (sreturn <| regionConcat xs) "findAll - fail" 
 
 /// If successful returns the concatenation of all regions.
 /// This is a bad API, should be at least private and maybe deleted.
 let private findPatternAll (searches:string list) : DocSoup<Region> =
     mapM findPattern searches >>>= fun xs ->
-    optionToAction (regionConcat xs) "findAllPattern - fail" 
+    optionToFailure (sreturn <| regionConcat xs) "findAllPattern - fail" 
     
+let private findSuccessM  (action: 'a -> DocSoup<'b>) (source:'a list) : DocSoup<'b> = 
+    DocSoup <| fun doc focus -> 
+        let rec work ys = 
+            match ys with
+            | [] -> Err "findSuccessM - not found"
+            | z :: zs -> 
+                match apply1 (action z) doc focus with
+                | Err _ -> work zs
+                | Ok ans -> Ok ans
+        work source
+
+/// Finds first table containing search text.
+/// If a match is found in "water" before a table, we continue the search.
+/// Bad API - wrong (misleading) name
+let findTable (search:string) (matchCase:bool) : DocSoup<TableAnchor> =
+    findTextMany search matchCase >>>= findSuccessM containingTable
 
 
 /// Possible findCell should be supplied with a tableAnchor to speed it up
@@ -602,11 +635,6 @@ let findCellsPattern (search:string) : DocSoup<CellAnchor list> =
 
 
 
-/// Finds first table containing search text.
-/// If a match is found in "water" before a table, we continue the search.
-/// Bad API - wrong (misleading) name
-let findTable (search:string) (matchCase:bool) : DocSoup<TableAnchor> =
-    findTextMany search matchCase >>>= findSuccessM containingTable
 
 
 
