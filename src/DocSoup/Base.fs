@@ -98,7 +98,7 @@ type TableAnchor =
     static member internal First = { TableIndex = 1 }
     member internal x.Index = x.TableIndex
     member internal x.Next = { TableIndex = x.TableIndex + 1 }
-
+    member internal x.Prev = { TableIndex = x.TableIndex - 1 }
 
 let internal getTable (anchor:TableAnchor) (doc:Word.Document) : option<Word.Table> = 
     try
@@ -140,6 +140,8 @@ let internal getCell (anchor:CellAnchor) (doc:Word.Document) : option<Word.Cell>
 let internal firstCell (table:TableAnchor)  = 
     { TableIx = table; CellIx = CellIndex.First }
     
+
+
 
 /// Word: Range.Find
 /// Operationally this is quite confusing.

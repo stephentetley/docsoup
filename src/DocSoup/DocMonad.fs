@@ -709,8 +709,69 @@ let cellAbove (cell:CellAnchor) : TableExtractor<CellAnchor> =
 
 
 // *************************************
-// Bad API for finding tables...
-// Needs re-thinking.
+// Find tables
+
+        
+type private Finder<'a> = Word.Table -> option<'a>
+
+let exactFinder (search:string) (matchCase:bool) : Finder<unit> = 
+    fun (table:Word.Table) -> boundedFind1 search matchCase (fun _ -> ()) table.Range
+
+    
+let patternFinder (search:string) : Finder<unit> = 
+    fun (table:Word.Table) -> boundedFindPattern1 search (fun _ -> ()) table.Range
+
+
+let private findSingle (finder:Finder<unit>) : DocExtractor<TableAnchor> =
+    DocSoup <| fun doc dict focus -> 
+        let rec work (ix:TableAnchor) : Result<TableAnchor> = 
+            // Rather than fail if not in focus, move next instead 
+            // otherwise fail would short-curcuit.
+            match apply1 (getTable ix) doc dict focus with
+            | Err msg -> work ix.Next
+            | Ok table -> 
+                match finder table with
+                | None -> work ix.Next
+                | Some _ -> Ok ix
+        work TableAnchor.First
+
+
+let private findMultiple (finder:Finder<'a>) : DocExtractor<TableAnchor list> =
+    DocSoup <| fun doc dict focus -> 
+        let tcount = doc.Tables.Count
+        let rec work (ix:TableAnchor) (ac: TableAnchor list) : Result<TableAnchor list> = 
+            if ix.Index > tcount then
+                Ok <| List.rev ac 
+            else
+                // Rather than fail if not in focus, move next instead 
+                // otherwise fail would short-curcuit.
+                match apply1 (getTable ix) doc dict focus with
+                | Err msg -> work ix.Next ac
+                | Ok table-> 
+                    match finder table with
+                    | None -> work ix.Next ac
+                    | Some _ -> work ix.Next (ix::ac)
+        work TableAnchor.First []
+
+/// Find the first table containing the search text.
+let findTable (search:string) (matchCase:bool) : DocExtractor<TableAnchor> = 
+    findSingle (exactFinder search matchCase)
+
+/// Find the first table where the search pattern matches.
+let findTableByPattern (search:string) : DocExtractor<TableAnchor> = 
+    findSingle (patternFinder search)
+
+/// Find all tables containing the search text.
+let findTables (search:string) (matchCase:bool) : DocExtractor<TableAnchor list> = 
+    findMultiple (exactFinder search matchCase)
+
+/// Find all tables where the search pattern matches.
+let findTablesByPattern (search:string) : DocExtractor<TableAnchor list> = 
+    findMultiple (patternFinder search)
+
+
+// *************************************
+// OLD - to improve...
 
 
 /// If successful returns the concatenation of all regions.
@@ -737,7 +798,7 @@ let private findSuccessM  (action: 'a -> DocSoup<'focus,'b>) (source:'a list) : 
         work source
 
 
-let findSuccessesM  (action: 'a -> DocSoup<'focus,'b>) 
+let private findSuccessesM  (action: 'a -> DocSoup<'focus,'b>) 
                         (source:'a list) : DocSoup<'focus,'b list> = 
     DocSoup <| fun doc dict focus -> 
         let rec work ac ys = 
@@ -749,13 +810,6 @@ let findSuccessesM  (action: 'a -> DocSoup<'focus,'b>)
                 | Ok ans -> work (ans::ac) zs
         work [] source
 
-
-
-/// Finds first table containing search text.
-/// If a match is found in "water" before a table, we continue the search.
-/// Bad API - wrong (misleading) name
-let findTable (search:string) (matchCase:bool) : DocSoup<'focus,TableAnchor> =
-    findTextMany search matchCase >>>= findSuccessM containingTable
 
 
 /// Possible findCell should be supplied with a tableAnchor to speed it up
@@ -772,96 +826,4 @@ let findCells (search:string) (matchCase:bool) : DocSoup<'focus,CellAnchor list>
 
 let findCellsPattern (search:string) : DocSoup<'focus,CellAnchor list> =
     findPatternMany search >>>= findSuccessesM containingCell
-
-
-
-
-
-
-/// Finds first table containing a match.
-/// If a match is found in "water" before a table, we continue the search.
-let findTablePattern (search:string) : DocSoup<'focus,TableAnchor> =
-    findPatternMany search >>>= findSuccessM containingTable
-
-
-/// Finds tables containing a match.
-/// If a match is found in "water" before a table, we continue the search.    
-let findTables (search:string) (matchCase:bool) : DocSoup<'focus,TableAnchor list> =
-    findTextMany search matchCase >>>= findSuccessesM containingTable
-
-
-let findTablesPattern (search:string) : DocSoup<'focus,TableAnchor list> =
-    findPatternMany search >>>= findSuccessesM containingTable
-
-/// Find first table that contains all the strings in the list of searches.
-/// THIS IS PROBABLY NOT WORKING CORRECTLY
-let findTableAll (searches:string list) (matchCase:bool) : DocSoup<'focus,TableAnchor> =
-    let rec work (ss:string list) (anchors: TableAnchor list) = 
-        match anchors with
-        | [] -> throwError "findTableAll not found" 
-        | (a1 :: rest) -> 
-            focusTable a1 (optional (findAll ss matchCase)) >>>= fun ans ->
-            match ans with
-            | Some _ -> sreturn a1
-            | None -> work ss rest
-    match searches with
-    | [] -> throwError "findTableAll empty search list"
-    | [s] -> findTable s matchCase
-    | (s :: ss) -> 
-        findTables s matchCase >>>= fun tables -> 
-        work ss tables
-
-/// Find tables that contain all the strings in the list of searches.
-/// THIS IS PROBABLY NOT WORKING CORRECTLY
-let findTablesAll (searches:string list) (matchCase:bool) : DocSoup<'focus,TableAnchor list> =
-    let rec work (ss:string list) (ac: TableAnchor list) (anchors: TableAnchor list)  = 
-        match anchors with
-        | [] -> sreturn (List.rev ac)
-        | (a1 :: rest) -> 
-            focusTable a1 (optional (findAll ss matchCase)) >>>= fun ans ->
-            match ans with
-            | Some _ -> work ss (a1::ac) rest
-            | None -> work ss ac rest
-    match searches with
-    | [] -> throwError "findTablesAll - empty search list"
-    | [s] -> findTables s matchCase
-    | (s :: ss) -> 
-        findTables s matchCase >>>= fun tables -> 
-        work ss [] tables
-
-let findTablePatternAll (searches:string list) : DocSoup<'focus,TableAnchor> =
-    let rec work (ss:string list) (anchors: TableAnchor list) = 
-        match anchors with
-        | [] -> throwError "findTablePatternAll not found" 
-        | (a1 :: rest) -> 
-            focusTable a1 (optional (findPatternAll ss)) >>>= fun ans ->
-            match ans with
-            | Some _ -> sreturn a1
-            | None -> work ss rest
-    match searches with
-    | [] -> throwError "findTablePatternAll empty search list"
-    | [s] -> findTablePattern s
-    | (s :: ss) -> 
-        findTablesPattern s  >>>= fun tables -> 
-        work ss tables
-
-let findTablesPatternAll (searches:string list) : DocSoup<'focus,TableAnchor list> =
-    let rec work (ss:string list) (ac: TableAnchor list) (anchors: TableAnchor list)  = 
-        match anchors with
-        | [] -> sreturn (List.rev ac)
-        | (a1 :: rest) -> 
-            focusTable a1 (optional (findPatternAll ss)) >>>= fun ans ->
-            match ans with
-            | Some _ -> work ss (a1::ac) rest
-            | None -> work ss ac rest
-    match searches with
-    | [] -> throwError "findTablesAll - empty search list"
-    | [s] -> findTablesPattern s 
-    | (s :: ss) -> 
-        findTablesPattern s >>>= fun tables -> 
-        work ss [] tables
-
-
-
-
 
