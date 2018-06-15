@@ -413,9 +413,12 @@ let runOnFileE (ma:DocExtractor<'a>) (fileName:string) : 'a =
 // *************************************
 // String level parsing with FParsec
 
+type ParsecParser<'ans> = Parser<'ans,unit>
+
+
 // We expect string level parsers might fail. 
 // Use this with caution or use execFParsecFallback.
-let execFParsec (parser:Parser<'a, unit>) : DocSoup<'focus,'a> = 
+let execFParsec (parser:ParsecParser<'a>) : DocSoup<'focus,'a> = 
     DocSoup <| fun doc dict focus ->
         match dict.GetText focus doc with
         | None -> Err "execFParsec - no input text"
@@ -430,7 +433,7 @@ type FParsecFallback<'a> =
     | FallbackText of string
 
 // Returns fallback text if FParsec fails.
-let execFParsecFallback (parser:Parser<'a, unit>) : DocSoup<'focus,FParsecFallback<'a>> = 
+let execFParsecFallback (parser:ParsecParser<'a>) : DocSoup<'focus,FParsecFallback<'a>> = 
     DocSoup <| fun doc dict focus ->
         match dict.GetText focus doc with
         | None -> Ok <| FallbackText ""
@@ -684,6 +687,15 @@ let tableHeader (anchor:TableAnchor) : DocSoup<'focus,Region> =
 // *************************************
 // Navigation
 
+/// Get the table by index - must be in focus.
+/// Note - indexing is from 1.
+let getTableByIndex (ix:int) : DocExtractor<TableAnchor> = 
+    let anchor = { TableIndex =  ix }
+    assertTableInFocus anchor >>>. sreturn anchor
+
+
+/// Get the cell by index - must be in focus.
+/// Note - indexing is from 1.
 let getCellByIndex (cellIx:CellIndex) : TableExtractor<CellAnchor> = 
     askTableFocus |>>> fun tix -> { TableIx = tix; CellIx = cellIx }
 
@@ -748,7 +760,7 @@ let private findTableSingle (finder:Finder<'a>) : DocExtractor<TableAnchor> =
             else
                 // Rather than fail if not in focus, move next instead 
                 // otherwise fail would short-curcuit.
-                // Note this mask index failures, hence tcount above.
+                // Note this masks index failures, hence tcount above.
                 match apply1 (getTable ix) doc dict focus with
                 | Err msg -> work ix.Next
                 | Ok table -> 
@@ -767,7 +779,7 @@ let private findTableMultiple (finder:Finder<'a>) : DocExtractor<TableAnchor lis
             else
                 // Rather than fail if not in focus, move next instead 
                 // otherwise fail would short-curcuit.
-                // Note this mask index failures, hence tcount above.
+                // Note this masks index failures, hence tcount above.
                 match apply1 (getTable ix) doc dict focus with
                 | Err msg -> work ix.Next ac
                 | Ok table-> 

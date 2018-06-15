@@ -8,110 +8,13 @@ open DocSoup.Base
 open DocSoup.DocMonad
 open DocSoup
 
-
-open FParsec
-open System.IO
+open SurveySyntax
 
 
-// Favour strings for data (even for dates, etc.).
-// Word surveys are very "free texty" and there is no guarantee the input data 
-// follows any format.
-
-// *************************************
-// Syntax tree
-
-type SiteInfo = 
-    { SiteName: string
-      SaiNumber: string
-      DischargeName: string 
-      ReceivingWatercourse: string }
-
-type SurveyInfo = 
-    { EngineerName: string
-      SurveyDate: string }
-
-type OutstationInfo = 
-    { OutstationName: string
-      RtuAddress: string
-      OutstationType: string
-      SerialNumber: string }
-    member v.isEmpty = 
-        v.OutstationName = ""
-            && v.RtuAddress = ""
-            && v.OutstationType = ""
-            && v.SerialNumber = ""
+// Note - layout changes are expected for the input documents we are querying here.
+// This makes us favour by-name access rather than (faster) by-index access.
 
 
-// Store relay number inside the data. This means we can have a sparse list of
-// relays.
-type RelaySetting = 
-    { RelayNumber: int
-      RelayFunction: string
-      OnSetPoint: string
-      OffSetPoint: string }
-    member v.isEmpty = 
-        v.RelayFunction = "" 
-            && v.OnSetPoint = ""
-            && v.OffSetPoint = ""
-
-
-type UltrasonicInfo = 
-    { MonitoredDischarge: string 
-      ProcessOrFacilityName: string
-      Manufacturer: string
-      Model: string
-      SerialNumber: string
-      PITag: string
-      EmptyDistance: string
-      Span: string
-      Relays: RelaySetting list }
-    member v.isEmpty = 
-        v.ProcessOrFacilityName = "" 
-            && v.Manufacturer = "" 
-            && v.Model = ""
-            && v.SerialNumber = ""
-            && v.PITag = ""
-            && v.EmptyDistance = ""
-            && v.Span = ""
-            && v.Relays.IsEmpty
-
-
-type OverflowType = SCREENED | UNSCREENED
-
-type ChamberInfo = 
-    { OverflowType: OverflowType
-      ChamberName: string 
-      RoofToInvert: string
-      UsFaceToInvert: string
-      OverflowToInvert: string
-      ScreenToInvert: string
-      EmergencyOverflowToInvert: string
-      }
-    member v.isEmpty = 
-        v.ChamberName = "" 
-            && v.RoofToInvert = "" 
-            && v.UsFaceToInvert = ""
-            && v.OverflowToInvert = ""
-            && v.ScreenToInvert = ""
-            && v.EmergencyOverflowToInvert = ""
-
-type OutfallInfo = 
-    { DischargeName: string 
-      OutfallGridRef: string
-      OutfallProven: string }
-    member v.isEmpty = 
-        v.OutfallGridRef = ""
-            && v.OutfallProven = ""
-
-type Survey = 
-    { SiteDetails: SiteInfo
-      SurveyInfo: SurveyInfo
-      OutstationInfo: option<OutstationInfo>
-      UltrasonicInfos: UltrasonicInfo list
-      ChamberInfos: ChamberInfo list 
-      OutfallInfos: OutfallInfo list
-      ScopeOfWorks: string 
-      AppendixText: string }
 
 // *************************************
 // Helpers
@@ -138,6 +41,15 @@ let getFieldValue (search:string) (matchCase:bool) : TableExtractor<string> =
     good <||> sreturn ""
 
 /// Returns "" if no cell matches the search.
+/// This speeds things up a bit, but for our use case here we are
+/// concerned about layout changes.
+let getFieldValueByRow (row:int) : TableExtractor<string> = 
+    let good = 
+        focusCellM (getCellByIndex { RowIx = row; ColumnIx = 2 }) <| getCellText
+    good <||> sreturn ""
+
+
+/// Returns "" if no cell matches the search.
 let getFieldValuePattern (search:string) : TableExtractor<string> = 
     let good = 
         focusCellM (findCellPattern search >>>= cellRight) <| getCellText
@@ -161,7 +73,7 @@ let parseMultipleTables (dict:MultiTableParser<'answer>) : DocExtractor<'answer 
 // Survey parsers
 
 let extractSiteDetails : DocExtractor<SiteInfo> = 
-    focusTableM (findTable "Site Details" true) <| 
+    focusTableM (getTableByIndex 1) <| 
         docSoup { 
             let! sname          = getFieldValue "Site Name" false
             let! uid            = getFieldValue "SAI Number" false
@@ -177,7 +89,7 @@ let extractSiteDetails : DocExtractor<SiteInfo> =
 
 
 let extractSurveyInfo : DocExtractor<SurveyInfo> = 
-    focusTableM (findTable "Site Details" true) <| 
+    focusTableM (getTableByIndex 2) <| 
         docSoup { 
             let! name       = getFieldValue "Engineer Name" false
             let! sdate      = getFieldValue "Date of Survey" false
@@ -227,22 +139,22 @@ let extractRelay (relayNumber:int) : TableExtractor<RelaySetting> =
 let extractRelays : TableExtractor<RelaySetting list> = 
     mapM extractRelay [1..6] |>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
-let extractUltrasonicInfo1 : TableExtractor<UltrasonicInfo> = 
+let extractUltrasonicMonitorInfo1 : TableExtractor<UltrasonicMonitorInfo> = 
     docSoup {
-        let! disName = getFieldValue "Discharge Being Monitored" false
-        let! procName = getFieldValue "Process or Facility" false
-        let! manuf = getFieldValue "Manufacturer" false
-        let! model = getFieldValue "Model" false
-        let! snumber = getFieldValue "Serial Number" false
-        let! piTag = getFieldValue "P & I Tag" false
-        let! emptyDist = getFieldValue "Empty Distance" false
-        let! span = getFieldValue "Span" false
-        let! relays =  extractRelays
+        let! disName    = getFieldValue "Discharge Being Monitored" false
+        let! procName   = getFieldValue "Process or Facility" false
+        let! manuf      = getFieldValue "Manufacturer" false
+        let! model      = getFieldValue "Model" false
+        let! snumber    = getFieldValue "Serial Number" false
+        let! piTag      = getFieldValue "P & I Tag" false
+        let! emptyDist  = getFieldValue "Empty Distance" false
+        let! span       = getFieldValue "Span" false
+        let! relays     =  extractRelays
         return { 
             MonitoredDischarge = disName
             ProcessOrFacilityName = procName
-            Manufacturer = manuf
-            Model = model
+            MonitorManufacturer = manuf
+            MonitorModel = model
             SerialNumber = snumber
             PITag = piTag
             EmptyDistance = emptyDist
@@ -250,11 +162,35 @@ let extractUltrasonicInfo1 : TableExtractor<UltrasonicInfo> =
             Relays = relays }
     } 
 
+let extractUltrasonicSensorInfo1 : TableExtractor<UltrasonicSensorInfo> = 
+    docSoup {
+        let! manuf      = getFieldValue "Manufacturer" false
+        let! model      = getFieldValue "Model" false
+        let! snumber    = getFieldValue "Serial Number" false
+        return { 
+            SensorManufacturer = manuf
+            SensorModel = model
+            SerialNumber = snumber 
+            LocationOfSensor = ""
+            GridRef = "" }
+    }
+
+let extractUltrasonicInfo1 (levelTable:TableAnchor) : DocExtractor<UltrasonicInfo> = 
+    docSoup {
+        let! monitor = 
+            focusTable levelTable extractUltrasonicMonitorInfo1
+        let! sensor = 
+            focusTableM (nextTable levelTable) extractUltrasonicSensorInfo1
+        return { 
+            MonitorInfo = monitor
+            SensorInfo = sensor } 
+    }
+
 
 let extractUltrasonicInfos : DocExtractor<UltrasonicInfo list>= 
     let dict: MultiTableParser<UltrasonicInfo> = 
         { GetAnchors = findTables "Ultrasonic Level Control" true;
-          TableParser = extractUltrasonicInfo1;
+          TableParser = extractUltrasonicMonitorInfo1;
           TestNotEmpty = fun (info:UltrasonicInfo) -> not info.isEmpty }
     parseMultipleTables dict <&?> "UltrasonicInfos"
 

@@ -14,6 +14,7 @@ open System.IO
 #load @"DocSoup\DocMonad.fs"
 open DocSoup.DocMonad
 
+#load @"SurveySyntax.fs"
 #load @"SurveyExtractor.fs"
 open SurveyExtractor
 

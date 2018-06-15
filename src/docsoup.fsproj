@@ -54,6 +54,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="DocSoup\Base.fs" />
     <Compile Include="DocSoup\DocMonad.fs" />
+    <Compile Include="SurveySyntax.fs" />
     <Compile Include="SurveyExtractor.fs" />
     <None Include="Test01.fsx" />
     <None Include="SurveyExtractor01.fsx" />
