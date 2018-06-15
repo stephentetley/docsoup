@@ -326,7 +326,7 @@ let scopeOfWorks : DocExtractor<string> =
 
 /// Single table - Title (1,1) = "Appendix", data in cell (r2,c1):
 let appendixText : DocExtractor<string> =         
-    focusTableM (findTable "Appendix..." true) <<
+    focusTableM (findTable "Appendix" true) <<
         focusCellM (getCellByIndex { RowIx = 2; ColumnIx = 1 }) <| getCellText
      
 

@@ -741,15 +741,20 @@ let patternFinderMany (search:string) : FinderMany<Region> =
 
 let private findTableSingle (finder:Finder<'a>) : DocExtractor<TableAnchor> =
     DocSoup <| fun doc dict focus -> 
+        let tcount = doc.Tables.Count
         let rec work (ix:TableAnchor) : Result<TableAnchor> = 
-            // Rather than fail if not in focus, move next instead 
-            // otherwise fail would short-curcuit.
-            match apply1 (getTable ix) doc dict focus with
-            | Err msg -> work ix.Next
-            | Ok table -> 
-                match finder table with
-                | None -> work ix.Next
-                | Some _ -> Ok ix
+            if ix.Index > tcount then
+                Err "findTableSingle - not found"
+            else
+                // Rather than fail if not in focus, move next instead 
+                // otherwise fail would short-curcuit.
+                // Note this mask index failures, hence tcount above.
+                match apply1 (getTable ix) doc dict focus with
+                | Err msg -> work ix.Next
+                | Ok table -> 
+                    match finder table with
+                    | None -> work ix.Next
+                    | Some _ -> Ok ix
         work TableAnchor.First
 
 
@@ -762,6 +767,7 @@ let private findTableMultiple (finder:Finder<'a>) : DocExtractor<TableAnchor lis
             else
                 // Rather than fail if not in focus, move next instead 
                 // otherwise fail would short-curcuit.
+                // Note this mask index failures, hence tcount above.
                 match apply1 (getTable ix) doc dict focus with
                 | Err msg -> work ix.Next ac
                 | Ok table-> 
