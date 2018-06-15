@@ -53,6 +53,8 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="DocSoup\Base.fs" />
+    <Compile Include="DocSoup\TableExtractor.fs" />
+    <Compile Include="DocSoup\DocExtractor.fs" />
     <Compile Include="DocSoup\DocMonad.fs" />
     <Compile Include="SurveySyntax.fs" />
     <Compile Include="SurveyExtractor.fs" />

@@ -9,17 +9,6 @@ open FParsec
 open DocSoup.Base
 
 
-type Result<'a> = 
-    | Err of string
-    | Ok of 'a
-
-let resultConcat (source:Result<'a> list) : Result<'a list> = 
-    let rec work ac xs = 
-        match xs with
-        | [] -> Ok <| List.rev ac
-        | Ok a::ys -> work (a::ac) ys
-        | Err msg :: _ -> Err msg
-    work [] source
             
 
 // Focus must allow:
@@ -413,7 +402,6 @@ let runOnFileE (ma:DocExtractor<'a>) (fileName:string) : 'a =
 // *************************************
 // String level parsing with FParsec
 
-type ParsecParser<'ans> = Parser<'ans,unit>
 
 
 // We expect string level parsers might fail. 
@@ -428,9 +416,7 @@ let execFParsec (parser:ParsecParser<'a>) : DocSoup<'focus,'a> =
             | Success(ans,_,_) -> Ok ans
             | Failure(msg,_,_) -> Err msg
 
-type FParsecFallback<'a> = 
-    | FParsecOk of 'a
-    | FallbackText of string
+
 
 // Returns fallback text if FParsec fails.
 let execFParsecFallback (parser:ParsecParser<'a>) : DocSoup<'focus,FParsecFallback<'a>> = 

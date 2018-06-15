@@ -10,7 +10,7 @@ open System.Text.RegularExpressions
 // All the PIA stuff online is outdated for Office 365 / .Net 4.5 / VS2015 
 open Microsoft.Office.Interop
 
-
+open FParsec
 
 let rbox (v : 'a) : obj ref = ref (box v)
 
@@ -206,4 +206,11 @@ let boundedFindPatternMany (search:string) (mapper:Word.Range -> 'a) (initialRan
     initialRange.Find.ClearFormatting ()
     List.unfold producer initialRange
 
+
+type ParsecParser<'ans> = Parser<'ans,unit>
+
+
+type FParsecFallback<'a> = 
+    | FParsecOk of 'a
+    | FallbackText of string
 
