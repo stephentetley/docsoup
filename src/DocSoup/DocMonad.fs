@@ -9,10 +9,18 @@ open FParsec
 open DocSoup.Base
 
 
-
 type Result<'a> = 
     | Err of string
     | Ok of 'a
+
+let resultConcat (source:Result<'a> list) : Result<'a list> = 
+    let rec work ac xs = 
+        match xs with
+        | [] -> Ok <| List.rev ac
+        | Ok a::ys -> work (a::ac) ys
+        | Err msg :: _ -> Err msg
+    work [] source
+            
 
 // Focus must allow:
 // Access to text and Region
@@ -709,20 +717,29 @@ let cellAbove (cell:CellAnchor) : TableExtractor<CellAnchor> =
 
 
 // *************************************
-// Find tables
+// Find tables and within tables
 
         
 type private Finder<'a> = Word.Table -> option<'a>
 
-let exactFinder (search:string) (matchCase:bool) : Finder<unit> = 
-    fun (table:Word.Table) -> boundedFind1 search matchCase (fun _ -> ()) table.Range
+let exactFinder (search:string) (matchCase:bool) : Finder<Region> = 
+    fun (table:Word.Table) -> boundedFind1 search matchCase extractRegion table.Range
 
     
-let patternFinder (search:string) : Finder<unit> = 
-    fun (table:Word.Table) -> boundedFindPattern1 search (fun _ -> ()) table.Range
+let patternFinder (search:string) : Finder<Region> = 
+    fun (table:Word.Table) -> boundedFindPattern1 search extractRegion table.Range
+
+type private FinderMany<'a> = Word.Table -> 'a list
+
+let exactFinderMany (search:string) (matchCase:bool) : FinderMany<Region> = 
+    fun (table:Word.Table) -> boundedFindMany search matchCase extractRegion table.Range
+    
+let patternFinderMany (search:string) : FinderMany<Region> = 
+    fun (table:Word.Table) -> boundedFindPatternMany search extractRegion table.Range
+    
 
 
-let private findSingle (finder:Finder<unit>) : DocExtractor<TableAnchor> =
+let private findTableSingle (finder:Finder<'a>) : DocExtractor<TableAnchor> =
     DocSoup <| fun doc dict focus -> 
         let rec work (ix:TableAnchor) : Result<TableAnchor> = 
             // Rather than fail if not in focus, move next instead 
@@ -736,7 +753,7 @@ let private findSingle (finder:Finder<unit>) : DocExtractor<TableAnchor> =
         work TableAnchor.First
 
 
-let private findMultiple (finder:Finder<'a>) : DocExtractor<TableAnchor list> =
+let private findTableMultiple (finder:Finder<'a>) : DocExtractor<TableAnchor list> =
     DocSoup <| fun doc dict focus -> 
         let tcount = doc.Tables.Count
         let rec work (ix:TableAnchor) (ac: TableAnchor list) : Result<TableAnchor list> = 
@@ -755,75 +772,52 @@ let private findMultiple (finder:Finder<'a>) : DocExtractor<TableAnchor list> =
 
 /// Find the first table containing the search text.
 let findTable (search:string) (matchCase:bool) : DocExtractor<TableAnchor> = 
-    findSingle (exactFinder search matchCase)
+    findTableSingle (exactFinder search matchCase)
 
 /// Find the first table where the search pattern matches.
 let findTableByPattern (search:string) : DocExtractor<TableAnchor> = 
-    findSingle (patternFinder search)
+    findTableSingle (patternFinder search)
 
 /// Find all tables containing the search text.
 let findTables (search:string) (matchCase:bool) : DocExtractor<TableAnchor list> = 
-    findMultiple (exactFinder search matchCase)
+    findTableMultiple (exactFinder search matchCase)
 
 /// Find all tables where the search pattern matches.
 let findTablesByPattern (search:string) : DocExtractor<TableAnchor list> = 
-    findMultiple (patternFinder search)
+    findTableMultiple (patternFinder search)
 
 
-// *************************************
-// OLD - to improve...
-
-
-/// If successful returns the concatenation of all regions.
-/// This is a bad API, should be at least private and maybe deleted.
-let private findAll (searches:string list) (matchCase:bool) : DocSoup<'focus,Region> =
-    mapM (fun s -> findText s matchCase) searches >>>= fun xs ->
-    optionToFailure (sreturn <| regionConcat xs) "findAll - fail" 
-
-/// If successful returns the concatenation of all regions.
-/// This is a bad API, should be at least private and maybe deleted.
-let private findPatternAll (searches:string list) : DocSoup<'focus,Region> =
-    mapM findPattern searches >>>= fun xs ->
-    optionToFailure (sreturn <| regionConcat xs) "findAllPattern - fail" 
-    
-let private findSuccessM  (action: 'a -> DocSoup<'focus,'b>) (source:'a list) : DocSoup<'focus,'b> = 
+let findCellSingle (finder:Finder<Region>) : TableExtractor<CellAnchor> =
     DocSoup <| fun doc dict focus -> 
-        let rec work ys = 
-            match ys with
-            | [] -> Err "findSuccessM - not found"
-            | z :: zs -> 
-                match apply1 (action z) doc dict focus with
-                | Err _ -> work zs
-                | Ok ans -> Ok ans
-        work source
+        match apply1 (getTable focus) doc dict focus with
+        | Err msg -> Err msg
+        | Ok table -> 
+            match finder table with
+            | None -> Err "findCell"
+            | Some region -> apply1 (containingCell region) doc dict focus
 
-
-let private findSuccessesM  (action: 'a -> DocSoup<'focus,'b>) 
-                        (source:'a list) : DocSoup<'focus,'b list> = 
+let findCellMultiple (finder:FinderMany<Region>) : TableExtractor<CellAnchor list> =
     DocSoup <| fun doc dict focus -> 
-        let rec work ac ys = 
-            match ys with
-            | [] -> Ok <| List.rev ac
-            | z :: zs -> 
-                match apply1 (action z) doc dict focus with
-                | Err _ -> work ac zs
-                | Ok ans -> work (ans::ac) zs
-        work [] source
+        let getAnchor (region:Region) = 
+            apply1 (containingCell region) doc dict focus 
+        match apply1 (getTable focus) doc dict focus with
+        | Err msg -> Err msg
+        | Ok table -> resultConcat << List.map getAnchor <| finder table 
 
 
+/// Find a cell in the focused table.
+let findCell (search:string) (matchCase:bool) : TableExtractor<CellAnchor> =
+    findCellSingle (exactFinder search matchCase)
 
-/// Possible findCell should be supplied with a tableAnchor to speed it up
+/// Find a cell in the focused table by wildcard pattern.
+let findCellPattern (search:string) : TableExtractor<CellAnchor> =
+    findCellSingle (patternFinder search)
 
-let findCell (search:string) (matchCase:bool) : DocSoup<'focus,CellAnchor> =
-    findTextMany search matchCase >>>= findSuccessM containingCell
+/// Find possibly multiple cells in the focused table.
+let findCells (search:string) (matchCase:bool) : TableExtractor<CellAnchor list> =
+    findCellMultiple (exactFinderMany search matchCase)
 
-let findCellPattern (search:string) : DocSoup<'focus,CellAnchor> =
-    findPatternMany search >>>= findSuccessM containingCell
-
-let findCells (search:string) (matchCase:bool) : DocSoup<'focus,CellAnchor list> =
-    findTextMany search matchCase >>>= findSuccessesM containingCell
-
-
-let findCellsPattern (search:string) : DocSoup<'focus,CellAnchor list> =
-    findPatternMany search >>>= findSuccessesM containingCell
+/// Find possibly multiple cells in the focused table by wildcard pattern.
+let findCellsPattern (search:string) : TableExtractor<CellAnchor list> =
+    findCellMultiple (patternFinderMany search)
 
