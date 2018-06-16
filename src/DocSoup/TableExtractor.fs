@@ -13,7 +13,7 @@ type TResult<'a> =
     | TErr of string
     | TOk of 'a
 
-let resultConcat (source:TResult<'a> list) : TResult<'a list> = 
+let private resultConcat (source:TResult<'a> list) : TResult<'a list> = 
     let rec work ac xs = 
         match xs with
         | [] -> TOk <| List.rev ac
