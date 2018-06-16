@@ -9,7 +9,18 @@ open FParsec
 open DocSoup.Base
 
 
-            
+
+type Result<'a> = 
+    | Err of string
+    | Ok of 'a
+
+let private resultConcat (source:Result<'a> list) : Result<'a list> = 
+    let rec work ac xs = 
+        match xs with
+        | [] -> Ok <| List.rev ac
+        | Ok a::ys -> work (a::ac) ys
+        | Err msg :: _ -> Err msg
+    work [] source
 
 // Focus must allow:
 // Access to text and Region

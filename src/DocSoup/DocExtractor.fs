@@ -369,7 +369,22 @@ let runOnFileE (ma:DocExtractor<'a>) (fileName:string) : 'a =
     | Err msg -> failwith msg
     | Ok (_,a) -> a
 
+// *************************************
+// Run tableExtractor
 
+let withTable (anchor:TableAnchor) (ma:TableExtractor<'a>) : DocExtractor<'a> = 
+    DocExtractor <| fun doc _ ->
+        try 
+            let table:Word.Table = doc.Tables.Item(anchor.Index)
+            match runTableExtractor (ma:TableExtractor<'a>) table with
+            | TErr msg -> Err msg
+            | TOk a -> 
+                let pos1 = table.Range.End + 1
+                Ok (pos1,a)
+        with
+        | _ -> Err "withTable" 
+
+// Now we have a cursor we can have a nextTable function.
 
 // *************************************
 // String level parsing with FParsec
