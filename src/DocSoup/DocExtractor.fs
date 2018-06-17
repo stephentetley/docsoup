@@ -384,7 +384,29 @@ let withTable (anchor:TableAnchor) (ma:TableExtractor<'a>) : DocExtractor<'a> =
         with
         | _ -> Err "withTable" 
 
+        
+let withTableM (anchorQuery:DocExtractor<TableAnchor>) (ma:TableExtractor<'a>) : DocExtractor<'a> = 
+    anchorQuery >>>= fun a -> withTable a ma 
+
 // Now we have a cursor we can have a nextTable function.
+let askNextTable : DocExtractor<TableAnchor> = 
+    DocExtractor <| fun doc pos ->
+        try 
+            let needle = { RegionStart = pos; RegionEnd = pos+1 }
+            let rec work (ix:TableAnchor) = 
+                if ix.TableIndex <= doc.Tables.Count then 
+                    let table = doc.Tables.Item (ix.TableIndex)
+                    let region = extractRegion table.Range
+                    if region.RegionStart >= pos then 
+                        Ok (pos,ix)
+                    else work ix.Next
+                else
+                    Err "askNextTable (no next table)"
+            work TableAnchor.First
+        with
+        | _ -> Err "askNextTable" 
+
+            
 
 // *************************************
 // String level parsing with FParsec

@@ -86,6 +86,12 @@ let (&>>=) (ma:TableExtractor<'a>)
 // API issue
 // Can all fmapM like things be done the outer monad (i.e. DocExtractor)?
 
+/// Left biased choice
+let (<|||>) (ma:TableExtractor<'a>) (mb:TableExtractor<'a>) : TableExtractor<'a> = 
+    TableExtractor <| fun table pos -> 
+        match apply1 ma table pos with
+        | TErr msg -> apply1 mb table pos
+        | TOk a -> TOk a
 
 
 
