@@ -640,35 +640,46 @@ let whiteSpace1 : DocExtractor<string> =
         | _ -> Err "whiteSpace1"
 
 
-            
+/// This ignores control characters.
+let internal removeControlPrefix : DocExtractor<unit> = 
+    DocExtractor <| fun doc pos -> 
+        try 
+            let range = doc.Range(Start=rbox pos)
+            let regMatch = Regex.Match(range.Text, @"\A[\p{C}]+")
+            if regMatch.Success then 
+                let pos1 = pos + regMatch.Length
+                Ok (pos1, ())
+            else
+                Ok (pos, ())
+        with
+        | _ -> Err "removeContrlPrefix"
 
 let private parseStringInternal (str:string) 
                                 (matchCase:bool) : DocExtractor<string> = 
     DocExtractor <| fun doc pos -> 
         match apply1 (findText str matchCase) doc pos with
-        | Err _ -> printfn "no find" ; Err "parseStringInternal"
+        | Err _ -> Err "parseStringInternal"
         | Ok (_,region) -> 
             if region.RegionStart = pos then 
                 let text = regionText region doc
                 Ok (region.RegionEnd, text)
             else
-                printfn "Pos=%i; RegionStart=%i; RegionEnd=%i" pos region.RegionStart region.RegionEnd
                 Err "parseStringInternal"
 
 let pstring (str:string) : DocExtractor<string> = 
-    parseStringInternal str true <&?> "pstring"
+    removeControlPrefix >>>. parseStringInternal str true <&?> "pstring"
 
 let pstringCI (str:string) : DocExtractor<string> = 
-    parseStringInternal str false <&?> "pstring"
+    removeControlPrefix >>>. parseStringInternal str false <&?> "pstringCI"
 
 let pchar (ch:char) : DocExtractor<char> = 
     docExtract { 
-        let! s1 = parseStringInternal (ch.ToString()) true
+        let! s1 = pstring (ch.ToString()) 
         if s1.Length = 1 then 
             return s1.[0]
         else
             throwError "pchar" |> ignore
-    }
+    } <&?> "pchar"
 
 
 /// This ignores control characters.

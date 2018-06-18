@@ -22,7 +22,7 @@ let testDoc2 = @"G:\work\working\Survey2.docx"
 
 let test01 () = 
     let procM : DocExtractor<_> = 
-        whiteSpace >>>. pstring "Event"
+        whiteSpace >>>. pstring "Survey"
     runOnFileE procM testDoc |> printfn "Ans: '%A'"
 
 
@@ -30,7 +30,12 @@ let test01 () =
 let test02 () = 
     let procM : DocExtractor<_> = 
         whiteSpace >>>. pchar 'E'
-    runOnFileE procM testDoc |> printfn "Ans: '%A'"
+    runOnFileE procM testDoc2 |> printfn "Ans: '%A'"
+
+let test02a () = 
+    let procM : DocExtractor<_> = 
+        whiteSpace >>>. pstring "Event"
+    runOnFileE procM testDoc2 |> printfn "Ans: '%A'"
 
 
 let test03 () = 
