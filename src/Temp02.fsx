@@ -17,7 +17,7 @@ open DocSoup.TableExtractor
 open DocSoup.DocExtractor
 
 let testDoc = @"G:\work\working\Survey1.docx"
-
+let testDoc2 = @"G:\work\working\Survey2.docx"
 
 
 let test01 () = 
@@ -43,7 +43,7 @@ let test03 () =
             return (a,b,c)
         }
     runOnFileE procM testDoc |> printfn "Ans: '%A'"
-
+    runOnFileE procM testDoc2 |> printfn "Ans: '%A'"
 
 let test04 () = 
     let procM : DocExtractor<_> = 
@@ -56,5 +56,12 @@ let test04 () =
             let! e = anyChar
             return (a,b,c,d,e)
         }
-    runOnFileE procM testDoc |> printfn "Ans: '%A'"
+    runOnFileE procM testDoc  |> printfn "Ans: '%A'"
+    runOnFileE procM testDoc2 |> printfn "Ans: '%A'"
+    
+let test05 () = 
+    let procM : DocExtractor<_> =  anyChar
+    runOnFileE procM testDoc  |> printfn "Ans: %A"
+    runOnFileE procM testDoc2 |> printfn "Ans: %A"
+
 

@@ -3,6 +3,7 @@
 
 module DocSoup.DocExtractor
 
+open System.Text.RegularExpressions
 open Microsoft.Office.Interop
 open FParsec
 
@@ -423,8 +424,7 @@ let runOnFile (ma:DocExtractor<'a>) (fileName:string) : Result<'a> =
         let app = new Word.ApplicationClass (Visible = false) :> Word.Application
         try 
             let doc = app.Documents.Open(FileName = ref (fileName :> obj))
-            // let region1 = maxRegion doc
-            let ans = apply1 ma doc 1
+            let ans = apply1 ma doc (doc.Range().Start)
             doc.Close(SaveChanges = rbox false)
             app.Quit()
             ans
@@ -665,13 +665,16 @@ let pchar (ch:char) : DocExtractor<char> =
 
 
 let anyChar : DocExtractor<char> = 
-    docExtract { 
-        let! s1 = parseStringInternal "^?" true
-        if s1.Length = 1 then 
-            return s1.[0]
-        else
-            throwError "pchar" |> ignore
-    }
-
-
+    DocExtractor <| fun doc pos0 -> 
+        try 
+            let rec work pos = 
+                let range = doc.Range(rbox pos, rbox <| pos+1)
+                if Regex.Match(range.Text, @"\p{C}").Success then 
+                    work (pos+1)
+                else
+                    let ch1 = cleanRangeText(range).[0]
+                    Ok (pos+1, ch1)
+            work pos0
+        with
+        | _ -> Err "anyChar"
 
