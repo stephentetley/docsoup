@@ -395,6 +395,22 @@ let sepBy (ma:DocExtractor<'a>)
             (sep:DocExtractor<_>) : DocExtractor<'a list> = 
     sepBy1 ma sep <||> dreturn []
 
+let manyTill (ma:DocExtractor<'a>) 
+                (terminator:DocExtractor<_>) : DocExtractor<'a list> = 
+    DocExtractor <| fun doc pos0 ->
+        let rec work pos ac = 
+            match apply1 terminator doc pos with
+            | Err msg -> 
+                match apply1 ma doc pos with
+                | Err msh -> Err msg
+                | Ok (pos1,a) -> work pos1 (a::ac) 
+            | Ok (pos1,_) -> Ok(pos1, List.rev ac)
+        work pos0 []
+
+let manyTill1 (ma:DocExtractor<'a>) 
+                (terminator:DocExtractor<_>) : DocExtractor<'a list> = 
+    liftM2 (fun a xs -> a::xs) ma (manyTill ma terminator)
+
 
 
 // *************************************
@@ -588,9 +604,38 @@ let findTextMany (search:string) (matchCase:bool) : DocExtractor<Region list> =
 
 /// Case sensitivity always appears to be true for Wildcard matches.
 let findPatternMany (search:string) : DocExtractor<Region list> =
-    DocExtractor <| fun doc pos  -> 
+    DocExtractor <| fun doc pos -> 
         let range =  getRangeToEnd pos doc 
         let finds = boundedFindPatternMany search extractRegion range
         Ok (pos,finds)
 
 
+let whiteSpace : DocExtractor<unit> = 
+    DocExtractor <| fun doc pos -> 
+        match apply1 (findText "^w" false) doc pos with
+        | Err _ -> Ok (pos, ())
+        | Ok (pos1,_) -> Ok (pos1, ())
+            
+
+let whiteSpace1 : DocExtractor<unit> = 
+    DocExtractor <| fun doc pos -> 
+        match apply1 (findText "^w" false) doc pos with
+        | Err _ -> Err "whiteSpace1"
+        | Ok (pos1,_) -> Ok (pos1, ())
+            
+
+let private parseStringInternal (str:string) 
+                                (matchCase:bool) : DocExtractor<string> = 
+    DocExtractor <| fun doc pos -> 
+        match apply1 (findText str matchCase) doc pos with
+        | Err _ -> Err "parseStringInternal"
+        | Ok (_,region) -> 
+            let text = regionText region doc
+            Ok (region.RegionEnd+1, text)
+        
+
+let parseString (str:string) : DocExtractor<string> = 
+    parseStringInternal str true
+
+let parseStringCI (str:string) : DocExtractor<string> = 
+    parseStringInternal str false

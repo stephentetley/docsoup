@@ -10,11 +10,8 @@ open Microsoft.Office.Interop
 open FParsec
 
 #load @"DocSoup\Base.fs"
-#load @"DocSoup\TableExtractor.fs"
-#load @"DocSoup\DocExtractor.fs"
 open DocSoup.Base
-open DocSoup.TableExtractor
-open DocSoup.DocExtractor
+
 
 let testDoc = @"G:\work\working\Survey1.docx"
 
@@ -126,6 +123,7 @@ let test04 (search:string)  =
 let test05 () = 
     let first = TableAnchor.First
     printfn "%A" first.Next.Next
+
 
 
 // Does sepBy (optionally) terminate?

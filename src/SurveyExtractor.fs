@@ -60,10 +60,8 @@ let getFieldValuePattern (search:string) : TableExtractor<string> =
 let section (number:int) 
                 (ma:DocExtractor<'a>) : DocExtractor<'a> = 
     let startMarker = sprintf "Section %i" number
-    let endMarker = sprintf "Section %i" (number+1)
-    between (findText startMarker true)
-            (lookahead <| findText endMarker true)
-            ma
+    advanceM (findTextEnd startMarker true) >>>. ma
+
 
 // *************************************
 // Survey parsers
@@ -241,18 +239,21 @@ let sectionOutstation : DocExtractor<OutstationInfo> =
 
 
 let sectionUltrasonics : DocExtractor<UltrasonicInfo list>= 
-    section 3 <| many1 extractUltrasonicInfo1
+    let stop = lookahead (whiteSpace >>>. parseString "Section 4")
+    section 3 <| manyTill1 extractUltrasonicInfo1 stop
     
 
 let sectionChambers : DocExtractor<ChamberInfo list>= 
-    section 4 <| many1 (nextTable extractChamberInfo1)
+    let stop = lookahead (whiteSpace >>>. parseString "Section 5")
+    section 4 <| manyTill1 (nextTable extractChamberInfo1) stop
 
 
 
 /// Note table parser would find finds "OutFall Photos" if we just looked for 
 /// "Outfall".
 let sectionOutfalls : DocExtractor<OutfallInfo list>= 
-    section 5 <| many1 (nextTable extractOutfallInfo1)
+    let stop = lookahead (whiteSpace >>>. parseString "Section 6")
+    section 5 <| manyTill (nextTable extractOutfallInfo1) stop
         
 
 
