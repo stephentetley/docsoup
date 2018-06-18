@@ -22,6 +22,39 @@ let testDoc = @"G:\work\working\Survey1.docx"
 
 let test01 () = 
     let procM : DocExtractor<_> = 
-        whiteSpace >>>. parseString "Event"
-        
-    runOnFileE procM testDoc |> printfn "%A"
+        whiteSpace >>>. pstring "Event"
+    runOnFileE procM testDoc |> printfn "Ans: '%A'"
+
+
+
+let test02 () = 
+    let procM : DocExtractor<_> = 
+        whiteSpace >>>. pchar 'E'
+    runOnFileE procM testDoc |> printfn "Ans: '%A'"
+
+
+let test03 () = 
+    let procM : DocExtractor<_> = 
+        docExtract { 
+            do! whiteSpace 
+            let! a = pstringCI "^?" 
+            let! b = pstringCI "^?"
+            let! c = pstringCI "^?"
+            return (a,b,c)
+        }
+    runOnFileE procM testDoc |> printfn "Ans: '%A'"
+
+
+let test04 () = 
+    let procM : DocExtractor<_> = 
+        docExtract { 
+            do! whiteSpace 
+            let! a = anyChar
+            let! b = anyChar
+            let! c = anyChar
+            let! d = anyChar
+            let! e = anyChar
+            return (a,b,c,d,e)
+        }
+    runOnFileE procM testDoc |> printfn "Ans: '%A'"
+

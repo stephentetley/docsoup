@@ -35,8 +35,7 @@ let main () : unit =
     let root = @"G:\work\Projects\events2\surveys_returned"
     System.IO.DirectoryInfo(root).GetDirectories ()
         |> Array.iteri 
-            (fun (ix:int) (info:System.IO.DirectoryInfo) -> 
-                if ix >= 2 then processSite info.FullName)
+            (fun (ix:int) (info:System.IO.DirectoryInfo) -> processSite info.FullName)
 
 
 

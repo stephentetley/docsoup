@@ -239,12 +239,12 @@ let sectionOutstation : DocExtractor<OutstationInfo> =
 
 
 let sectionUltrasonics : DocExtractor<UltrasonicInfo list>= 
-    let stop = lookahead (whiteSpace >>>. parseString "Section 4")
+    let stop = lookahead (whiteSpace >>>. pstring "Section 4")
     section 3 <| manyTill1 extractUltrasonicInfo1 stop
     
 
 let sectionChambers : DocExtractor<ChamberInfo list>= 
-    let stop = lookahead (whiteSpace >>>. parseString "Section 5")
+    let stop = lookahead (whiteSpace >>>. pstring "Section 5")
     section 4 <| manyTill1 (nextTable extractChamberInfo1) stop
 
 
@@ -252,8 +252,8 @@ let sectionChambers : DocExtractor<ChamberInfo list>=
 /// Note table parser would find finds "OutFall Photos" if we just looked for 
 /// "Outfall".
 let sectionOutfalls : DocExtractor<OutfallInfo list>= 
-    let stop = lookahead (whiteSpace >>>. parseString "Section 6")
-    section 5 <| manyTill (nextTable extractOutfallInfo1) stop
+    let stop = lookahead (whiteSpace >>>. pstring "Section 6")
+    section 5 <| manyTill1 (nextTable extractOutfallInfo1) stop
         
 
 

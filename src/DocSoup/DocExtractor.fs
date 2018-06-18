@@ -402,7 +402,7 @@ let manyTill (ma:DocExtractor<'a>)
             match apply1 terminator doc pos with
             | Err msg -> 
                 match apply1 ma doc pos with
-                | Err msh -> Err msg
+                | Err msg -> Err msg
                 | Ok (pos1,a) -> work pos1 (a::ac) 
             | Ok (pos1,_) -> Ok(pos1, List.rev ac)
         work pos0 []
@@ -423,8 +423,8 @@ let runOnFile (ma:DocExtractor<'a>) (fileName:string) : Result<'a> =
         let app = new Word.ApplicationClass (Visible = false) :> Word.Application
         try 
             let doc = app.Documents.Open(FileName = ref (fileName :> obj))
-            let region1 = maxRegion doc
-            let ans = apply1 ma doc region1.RegionStart
+            // let region1 = maxRegion doc
+            let ans = apply1 ma doc 1
             doc.Close(SaveChanges = rbox false)
             app.Quit()
             ans
@@ -614,28 +614,64 @@ let whiteSpace : DocExtractor<unit> =
     DocExtractor <| fun doc pos -> 
         match apply1 (findText "^w" false) doc pos with
         | Err _ -> Ok (pos, ())
-        | Ok (pos1,_) -> Ok (pos1, ())
-            
+        | Ok (_,region) -> 
+            // findText can find a subsequent region...
+            if region.RegionStart = pos then
+                Ok (region.RegionEnd, ())
+            else
+                Ok (pos, ())
+
 
 let whiteSpace1 : DocExtractor<unit> = 
     DocExtractor <| fun doc pos -> 
         match apply1 (findText "^w" false) doc pos with
         | Err _ -> Err "whiteSpace1"
-        | Ok (pos1,_) -> Ok (pos1, ())
+        | Ok (_,region) -> 
+            // findText can find a subsequent region... 
+            if region.RegionStart = pos && region.RegionEnd > pos then 
+                Ok (region.RegionEnd, ())
+            else
+                Err "whiteSpace1 (none)"
             
 
 let private parseStringInternal (str:string) 
                                 (matchCase:bool) : DocExtractor<string> = 
     DocExtractor <| fun doc pos -> 
         match apply1 (findText str matchCase) doc pos with
-        | Err _ -> Err "parseStringInternal"
+        | Err _ -> printfn "no find" ; Err "parseStringInternal"
         | Ok (_,region) -> 
-            let text = regionText region doc
-            Ok (region.RegionEnd+1, text)
-        
+            if region.RegionStart = pos then 
+                let text = regionText region doc
+                Ok (region.RegionEnd, text)
+            else
+                printfn "Pos=%i; RegionStart=%i; RegionEnd=%i" pos region.RegionStart region.RegionEnd
+                Err "parseStringInternal"
 
-let parseString (str:string) : DocExtractor<string> = 
-    parseStringInternal str true
+let pstring (str:string) : DocExtractor<string> = 
+    parseStringInternal str true <&?> "pstring"
 
-let parseStringCI (str:string) : DocExtractor<string> = 
-    parseStringInternal str false
+let pstringCI (str:string) : DocExtractor<string> = 
+    parseStringInternal str false <&?> "pstring"
+
+let pchar (ch:char) : DocExtractor<char> = 
+    docExtract { 
+        let! s1 = parseStringInternal (ch.ToString()) true
+        if s1.Length = 1 then 
+            return s1.[0]
+        else
+            throwError "pchar" |> ignore
+    }
+
+
+
+let anyChar : DocExtractor<char> = 
+    docExtract { 
+        let! s1 = parseStringInternal "^?" true
+        if s1.Length = 1 then 
+            return s1.[0]
+        else
+            throwError "pchar" |> ignore
+    }
+
+
+

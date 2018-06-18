@@ -125,6 +125,13 @@ let test05 () =
     printfn "%A" first.Next.Next
 
 
+let test06 () = 
+    let procM (doc:Word.Document) = 
+        let range1 = doc.Range(rbox 1, rbox 2)
+        let text = range1.Text
+        printfn "Rang{1,2}.text = %s" text
+    run procM testDoc
+
 
 // Does sepBy (optionally) terminate?
 let testFParsec01 () = 
