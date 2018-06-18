@@ -219,14 +219,14 @@ let askCellPosition : TableExtractor<CellIndex> =
 
 /// Restrict focus to a part of the input doc identified by region.
 /// Focus type stays the same
-let focusCell (cell:CellIndex) (ma:TableExtractor<'a>) : TableExtractor<'a> = 
+let withCell (cell:CellIndex) (ma:TableExtractor<'a>) : TableExtractor<'a> = 
     TableExtractor <| fun table _ -> 
         apply1 ma table cell
 
 // Version of focus that binds the cell returned from a query.
-let focusCellM (cellQuery:TableExtractor<CellIndex>) 
+let withCellM (cellQuery:TableExtractor<CellIndex>) 
                 (ma:TableExtractor<'a>) : TableExtractor<'a> = 
-    cellQuery &>>= fun cell -> focusCell cell ma
+    cellQuery &>>= fun cell -> withCell cell ma
 
 
 // *************************************

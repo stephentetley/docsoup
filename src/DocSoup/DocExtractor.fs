@@ -337,6 +337,24 @@ let boolify (ma:DocExtractor<'a>) : DocExtractor<bool> =
 // *************************************
 // Parser combinators
 
+/// End of document?
+let eof : DocExtractor<unit> =
+    DocExtractor <| fun doc pos ->
+        if pos >= doc.Range().End then 
+            Ok (pos, ())
+        else
+            Err "eof (not-at-end)"
+
+
+/// Parses p without consuming input
+let lookahead (ma:DocExtractor<'a>) : DocExtractor<'a> =
+    DocExtractor <| fun doc pos ->
+        match apply1 ma doc pos with
+        | Err msg -> Err msg
+        | Ok (_,a) -> Ok (pos,a)
+
+
+
 let between (popen:DocExtractor<_>) (pclose:DocExtractor<_>) 
             (ma:DocExtractor<'a>) : DocExtractor<'a> =
     docExtract { 
@@ -410,6 +428,8 @@ let runOnFileE (ma:DocExtractor<'a>) (fileName:string) : 'a =
     | Err msg -> failwith msg
     | Ok (_,a) -> a
 
+
+
 // *************************************
 // Run tableExtractor
 
@@ -447,13 +467,16 @@ let askNextTable : DocExtractor<TableAnchor> =
         with
         | _ -> Err "askNextTable" 
 
+
+/// Note - this is unguarded, use with care in many, many1 etc. 
 let nextTable (ma:TableExtractor<'a>) : DocExtractor<'a> = 
     withTableM askNextTable ma
 
 // *************************************
 // String level parsing with FParsec
 
-
+// TODO - FParsec will have to run in regions so that we have a
+// stopping boundary.
 
 // We expect string level parsers might fail. 
 // Use this with caution or use execFParsecFallback.
