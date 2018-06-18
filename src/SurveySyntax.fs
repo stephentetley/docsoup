@@ -120,7 +120,7 @@ type OutfallInfo =
 type Survey = 
     { SiteDetails: SiteInfo
       SurveyInfo: SurveyInfo
-      OutstationInfo: option<OutstationInfo>
+      OutstationInfo: OutstationInfo
       UltrasonicInfos: UltrasonicInfo list
       ChamberInfos: ChamberInfo list 
       OutfallInfos: OutfallInfo list

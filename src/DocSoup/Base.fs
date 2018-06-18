@@ -38,6 +38,9 @@ let maxRegion (doc:Word.Document) : Region = extractRegion <| doc.Range()
 let getRange (region:Region) (doc:Word.Document) : Word.Range = 
     doc.Range(rbox <| region.RegionStart, rbox <| region.RegionEnd - 1)
 
+let getRangeToEnd (pos:int) (doc:Word.Document) : Word.Range = 
+    doc.Range(rbox <| pos, rbox <| doc.Range().End)
+
 // Use (Single Case) Struct Unions to get the same things as Haskell Newtypes.
 
 let isSubregionOf (haystack:Region) (needle:Region) : bool = 

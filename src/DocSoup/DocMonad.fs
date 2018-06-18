@@ -33,6 +33,8 @@ type FocusDict<'focus> =
 
 let getRange (dict:FocusDict<'focus>) (focus:'focus) (doc:Word.Document) : option<Word.Range> = 
    dict.GetRegion focus doc |> Option.map (fun r1 -> getRange r1 doc)
+
+
 type DocumentAnchor = Region   
 
 type DocumentFocus = FocusDict<DocumentAnchor>

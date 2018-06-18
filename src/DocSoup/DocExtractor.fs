@@ -406,7 +406,8 @@ let askNextTable : DocExtractor<TableAnchor> =
         with
         | _ -> Err "askNextTable" 
 
-            
+let nextTable (ma:TableExtractor<'a>) : DocExtractor<'a> = 
+    withTableM askNextTable ma
 
 // *************************************
 // String level parsing with FParsec
@@ -456,6 +457,39 @@ let (<&?>) (ma:DocExtractor<'a>) (msg:string) : DocExtractor<'a> =
 
 let (<?&>) (msg:string) (ma:DocExtractor<'a>) : DocExtractor<'a> = 
     swapError msg ma
+
+
+// *************************************
+// Search text for "anchors"
+
+[<Struct>]
+type SearchAnchor = 
+    private SearchAnchor of int
+        member v.Position = match v with | SearchAnchor i -> i
+
+
+let withSearchAnchor (anchor:SearchAnchor) 
+                        (ma:DocExtractor<'a>) : DocExtractor<'a> = 
+    DocExtractor <| fun doc pos  -> 
+        if anchor.Position > pos then   
+           apply1 ma doc anchor.Position
+        else
+           Err "withSearchAnchor"
+
+let withSearchAnchorM (anchorQuery:DocExtractor<SearchAnchor>) 
+                        (ma:DocExtractor<'a>) : DocExtractor<'a> = 
+    anchorQuery >>>= fun a -> withSearchAnchor a ma
+
+let advanceM (anchorQuery:DocExtractor<SearchAnchor>) : DocExtractor<unit> = 
+    withSearchAnchorM anchorQuery (dreturn ())
+
+let findText (search:string) (matchCase:bool) : DocExtractor<SearchAnchor> =
+    DocExtractor <| fun doc pos  -> 
+        let range =  getRangeToEnd pos doc 
+        match boundedFind1 search matchCase extractRegion range with
+        | Some region -> Ok (pos, SearchAnchor <| region.RegionStart)
+        | None -> Err <| sprintf "findText - '%s' not found" search
+
 
 
 // *************************************
@@ -532,17 +566,7 @@ let (<?&>) (msg:string) (ma:DocExtractor<'a>) : DocExtractor<'a> =
 
 
 
-// *************************************
-// Search text for "anchors"
 
-//let findText (search:string) (matchCase:bool) : DocExtractor<Region> =
-//    DocExtractor <| fun doc pos  -> 
-//        match getRange pos doc with
-//        | None -> Err "findText fail"
-//        | Some range -> 
-//            match boundedFind1 search matchCase extractRegion range with
-//            | Some region -> Ok region
-//            | None -> Err <| sprintf "findText - '%s' not found" search
 
 /// Case sensitivity always appears to be true for Wildcard matches.
 //let findPattern (search:string) : DocExtractor<Region> =

@@ -85,6 +85,38 @@ let (&>>=) (ma:TableExtractor<'a>)
 
 // API issue
 // Can all fmapM like things be done the outer monad (i.e. DocExtractor)?
+// Not really, it feels like they are essential. So we will have to rely 
+// on qualified names and "respellings" for the operators.
+
+
+
+let fmapM (fn:'a -> 'b) (ma:TableExtractor<'a>) : TableExtractor<'b> = 
+    TableExtractor <| fun table pos -> 
+       match apply1 ma table pos with
+       | TErr msg -> TErr msg
+       | TOk a -> TOk (fn a)
+
+
+let mapM (p: 'a -> TableExtractor<'b>) (source:'a list) : TableExtractor<'b list> = 
+    TableExtractor <| fun table pos -> 
+        let rec work ac ys = 
+            match ys with
+            | [] -> TOk (List.rev ac)
+            | z :: zs -> 
+                match apply1 (p z) table pos with
+                | TErr msg -> TErr msg
+                | TOk ans -> work (ans::ac) zs
+        work [] source
+
+/// Operator for fmap.
+let (||>>>) (ma:TableExtractor<'a>) (fn:'a -> 'b) : TableExtractor<'b> = 
+    fmapM fn ma
+
+/// Flipped fmap.
+let (<<<||) (fn:'a -> 'b) (ma:TableExtractor<'a>) : TableExtractor<'b> = 
+    fmapM fn ma
+
+
 
 /// Left biased choice
 let (<|||>) (ma:TableExtractor<'a>) (mb:TableExtractor<'a>) : TableExtractor<'a> = 
@@ -93,6 +125,13 @@ let (<|||>) (ma:TableExtractor<'a>) (mb:TableExtractor<'a>) : TableExtractor<'a>
         | TErr msg -> apply1 mb table pos
         | TOk a -> TOk a
 
+
+/// Optionally parses. When the parser fails return None and don't move the cursor position.
+let optional (ma:TableExtractor<'a>) : TableExtractor<'a option> = 
+    TableExtractor <| fun table pos ->
+        match apply1 ma table pos with
+        | TErr _ -> TOk None
+        | TOk a -> TOk (Some a)
 
 
 // *************************************
