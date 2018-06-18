@@ -36,7 +36,7 @@ let test02 () =
 let test03 () = 
     let procM : DocExtractor<_> = 
         docExtract { 
-            do! whiteSpace 
+            do! whiteSpace |>>> ignore
             let! a = pstringCI "^?" 
             let! b = pstringCI "^?"
             let! c = pstringCI "^?"
@@ -48,7 +48,7 @@ let test03 () =
 let test04 () = 
     let procM : DocExtractor<_> = 
         docExtract { 
-            do! whiteSpace 
+            do! whiteSpace |>>> ignore
             let! a = anyChar
             let! b = anyChar
             let! c = anyChar

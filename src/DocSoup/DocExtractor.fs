@@ -610,28 +610,36 @@ let findPatternMany (search:string) : DocExtractor<Region list> =
         Ok (pos,finds)
 
 
-let whiteSpace : DocExtractor<unit> = 
+// *************************************
+// Character level parsers
+
+let whiteSpace : DocExtractor<string> = 
     DocExtractor <| fun doc pos -> 
-        match apply1 (findText "^w" false) doc pos with
-        | Err _ -> Ok (pos, ())
-        | Ok (_,region) -> 
-            // findText can find a subsequent region...
-            if region.RegionStart = pos then
-                Ok (region.RegionEnd, ())
-            else
-                Ok (pos, ())
+        try 
+            let range = doc.Range(Start=rbox pos)
+            let regMatch = Regex.Match(range.Text, @"^[\p{C}-[\r\n]]+")
+            if regMatch.Success then 
+                let pos1 = pos + regMatch.Length + 1
+                Ok (pos1, regMatch.Value)
+            else 
+                Ok (pos,"")
+        with
+        | _ -> Err "whiteSpace"
+
+let whiteSpace1 : DocExtractor<string> = 
+    DocExtractor <| fun doc pos -> 
+        try 
+            let range = doc.Range(Start=rbox pos)
+            let regMatch = Regex.Match(range.Text, @"^[\p{C}-[\r\n]]+")
+            if regMatch.Success then 
+                let pos1 = pos + regMatch.Length + 1
+                Ok (pos1, regMatch.Value)
+            else 
+                Err "whiteSpace1"
+        with
+        | _ -> Err "whiteSpace1"
 
 
-let whiteSpace1 : DocExtractor<unit> = 
-    DocExtractor <| fun doc pos -> 
-        match apply1 (findText "^w" false) doc pos with
-        | Err _ -> Err "whiteSpace1"
-        | Ok (_,region) -> 
-            // findText can find a subsequent region... 
-            if region.RegionStart = pos && region.RegionEnd > pos then 
-                Ok (region.RegionEnd, ())
-            else
-                Err "whiteSpace1 (none)"
             
 
 let private parseStringInternal (str:string) 
@@ -663,18 +671,21 @@ let pchar (ch:char) : DocExtractor<char> =
     }
 
 
-
+/// This ignores control characters.
 let anyChar : DocExtractor<char> = 
-    DocExtractor <| fun doc pos0 -> 
+    DocExtractor <| fun doc pos -> 
         try 
-            let rec work pos = 
-                let range = doc.Range(rbox pos, rbox <| pos+1)
-                if Regex.Match(range.Text, @"\p{C}").Success then 
-                    work (pos+1)
-                else
-                    let ch1 = cleanRangeText(range).[0]
-                    Ok (pos+1, ch1)
-            work pos0
+            let range = doc.Range(Start=rbox pos)
+            let regMatch = Regex.Match(range.Text, @"\A[\p{C}]+")
+            if regMatch.Success then 
+                let pos1 = pos + regMatch.Length
+                let range1 = doc.Range(Start = rbox pos1)
+                let ch1 = cleanRangeText(range1).[0]
+                Ok (pos1+1, ch1)
+            else
+                let range1 = doc.Range(Start=rbox pos)
+                let ch1 = cleanRangeText(range1).[0]
+                Ok (pos+1, ch1)
         with
         | _ -> Err "anyChar"
 
