@@ -290,7 +290,7 @@ let findM  (action: 'a -> DocExtractor<bool>) (source:'a list) : DocExtractor<'a
 
 /// The action is expected to return ``true`` or `false``- if it throws 
 /// an error then the error is passed upwards.
-let tryFindM  (action: 'a -> DocExtractor<bool>) 
+let tryFindM (action: 'a -> DocExtractor<bool>) 
                 (source:'a list) : DocExtractor<'a option> = 
     DocExtractor <| fun doc pos0 -> 
         let rec work pos ys = 
@@ -334,7 +334,48 @@ let boolify (ma:DocExtractor<'a>) : DocExtractor<bool> =
         | Err _ -> Ok (pos,false)
         | Ok (pos1,_) -> Ok (pos1,true)
 
+// *************************************
+// Parser combinators
 
+let between (popen:DocExtractor<_>) (pclose:DocExtractor<_>) 
+            (ma:DocExtractor<'a>) : DocExtractor<'a> =
+    docExtract { 
+        let! _ = popen
+        let! ans = ma
+        let! _ = pclose
+        return ans 
+    }
+
+
+let many (ma:DocExtractor<'a>) : DocExtractor<'a list> = 
+    DocExtractor <| fun doc pos0 ->
+        let rec work pos ac = 
+            match apply1 ma doc pos with
+            | Err _ -> Ok (pos, List.rev ac)
+            | Ok (pos1,a) -> work pos1 (a::ac)
+        work pos0 []
+
+let many1 (ma:DocExtractor<'a>) : DocExtractor<'a list> = 
+    docExtract { 
+        let! a1 = ma
+        let! rest = many ma
+        return (a1::rest) 
+    } 
+
+let skipMany (ma:DocExtractor<'a>) : DocExtractor<unit> = 
+    many ma >>>= fun _ -> dreturn ()
+
+let sepBy1 (ma:DocExtractor<'a>) 
+            (sep:DocExtractor<_>) : DocExtractor<'a list> = 
+    docExtract { 
+        let! a1 = ma
+        let! rest = many (sep >>>. ma) 
+        return (a1::rest)
+    }
+
+let sepBy (ma:DocExtractor<'a>) 
+            (sep:DocExtractor<_>) : DocExtractor<'a list> = 
+    sepBy1 ma sep <||> dreturn []
 
 
 
@@ -467,6 +508,11 @@ type SearchAnchor =
     private SearchAnchor of int
         member v.Position = match v with | SearchAnchor i -> i
 
+let private startOfRegion (region:Region) : SearchAnchor = 
+    SearchAnchor region.RegionStart
+
+let private endOfRegion (region:Region) : SearchAnchor = 
+    SearchAnchor region.RegionEnd
 
 let withSearchAnchor (anchor:SearchAnchor) 
                         (ma:DocExtractor<'a>) : DocExtractor<'a> = 
@@ -483,264 +529,45 @@ let withSearchAnchorM (anchorQuery:DocExtractor<SearchAnchor>)
 let advanceM (anchorQuery:DocExtractor<SearchAnchor>) : DocExtractor<unit> = 
     withSearchAnchorM anchorQuery (dreturn ())
 
-let findText (search:string) (matchCase:bool) : DocExtractor<SearchAnchor> =
+
+let findText (search:string) (matchCase:bool) : DocExtractor<Region> =
     DocExtractor <| fun doc pos  -> 
         let range =  getRangeToEnd pos doc 
         match boundedFind1 search matchCase extractRegion range with
-        | Some region -> Ok (pos, SearchAnchor <| region.RegionStart)
+        | Some region -> Ok (pos, region)
         | None -> Err <| sprintf "findText - '%s' not found" search
 
+let findTextStart (search:string) (matchCase:bool) : DocExtractor<SearchAnchor> =
+    findText search matchCase |>>> startOfRegion
 
-
-// *************************************
-// Old...
-
-
-
-/// Implementation note - this uses Word's table index (which is 1-indexed, IIRC)
-/// Note, the actual index value should never be exposed to client code.
-//let private getTable (anchor:TableAnchor) : DocExtractor< Word.Table> = 
-//    DocExtractor <| fun doc pos -> 
-//        match dict.GetRegion focus doc with
-//        | None -> Err "getTable failure"
-//        | Some focus1 -> 
-//            match getTable anchor doc with
-//            | None -> Err "getTable error (index out-of-range?)"
-//            | Some table -> 
-//                if isSubregionOf focus1 (extractRegion table.Range) then 
-//                    Ok table
-//                else
-//                    Err "getTable error (not in focus)"
-
-
-/// Note - potentially not all of the table might be in focus.
-//let private getCell (anchor:CellAnchor) : DocExtractor<Word.Cell> = 
-//    DocExtractor <| fun doc pos ->
-//        match dict.GetRegion focus doc with
-//        | None -> Err "getTable failure"
-//        | Some focus1 -> 
-//            match getCell anchor doc with
-//            | None -> Err "getCell error (index out-of-range?)"
-//            | Some cell -> 
-//                if isSubregionOf focus1 (extractRegion cell.Range) then 
-//                    Ok cell
-//                else
-//                    Err "getCell error (not in focus)"
-
-
-/// Restrict focus to a part of the input doc identified by the table anchor.
-//let focusTable (anchor:TableAnchor) (ma:DocSoup<TableAnchor,'a>) : DocExtractor<'a> = 
-//    DocExtractor <| fun doc _ _ -> apply1 ma doc tableFocus anchor
-
-/// Version of focusTable that binds the anchor returned from a query.
-//let focusTableM (tableQuery:DocExtractor<TableAnchor>) 
-//                (ma:DocSoup<TableAnchor,'a>) : DocExtractor<'a> = 
-//    tableQuery >>>= fun anchor -> focusTable anchor ma
-
-/// Restrict focus to a part of the input doc identified by the cell anchor.
-//let focusCell (anchor:CellAnchor) (ma:DocSoup<CellAnchor,'a>) : DocExtractor<'a> = 
-//    DocExtractor <| fun doc _ _ -> apply1 ma doc cellFocus anchor
-
-
-/// Version of focusCell that binds the anchor returned from a query.
-//let focusCellM (cellQuery:DocExtractor<CellAnchor>) (ma:DocSoup<CellAnchor,'a>) : DocExtractor<'a> = 
-//    cellQuery >>>= fun anchor -> focusCell anchor ma
-    
-
-// *************************************
-// Retrieve input
-
-/// This gets the text within the current focus.     
-/// [Value restriction without ()]
-//let private getText () : DocExtractor<string> =
-//    DocExtractor <| fun doc pos -> 
-//        match dict.GetText focus doc with
-//        | None -> Err "getText"
-//        | Some text -> Ok <| text.Trim ()
-
-
-
-/// This gets all the text from a document that is within the current focus.
-//let getFocusedText : DocExtractor<string> = getText ()
-
-
-
-
-
+let findTextEnd (search:string) (matchCase:bool) : DocExtractor<SearchAnchor> =
+    findText search matchCase |>>> endOfRegion
 
 /// Case sensitivity always appears to be true for Wildcard matches.
-//let findPattern (search:string) : DocExtractor<Region> =
-//    DocExtractor <| fun doc pos  -> 
-//        match getRange pos doc with
-//        | None -> Err "findPattern fail"
-//        | Some range ->
-//            match boundedFindPattern1 search extractRegion range with
-//            | Some region -> Ok region
-//            | None -> Err <| sprintf "findPattern - '%s' not found" search
+let findPattern (search:string) : DocExtractor<Region> =
+    DocExtractor <| fun doc pos  -> 
+        let range =  getRangeToEnd pos doc 
+        match boundedFindPattern1 search extractRegion range with
+        | Some region -> Ok (pos, region)
+        | None -> Err <| sprintf "findPattern - '%s' not found" search
         
+let findPatternStart (search:string)  : DocExtractor<SearchAnchor> =
+    findPattern search |>>> startOfRegion
 
-//let findTextMany (search:string) (matchCase:bool) : DocExtractor<Region list> =
-//    DocExtractor <| fun doc pos  -> 
-//        match getRange pos doc with
-//        | None -> Err "findTextMany"
-//        | Some range ->
-//            Ok <| boundedFindMany search matchCase extractRegion range
+let findPatternEnd (search:string) : DocExtractor<SearchAnchor> =
+    findPattern search |>>> endOfRegion
 
+let findTextMany (search:string) (matchCase:bool) : DocExtractor<Region list> =
+    DocExtractor <| fun doc pos  -> 
+        let range =  getRangeToEnd pos doc 
+        let finds = boundedFindMany search matchCase extractRegion range
+        Ok (pos,finds)
 
 /// Case sensitivity always appears to be true for Wildcard matches.
-//let findPatternMany (search:string) : DocExtractor<Region list> =
-//    DocExtractor <| fun doc pos  -> 
-//        match getRange pos doc with
-//        | None -> Err "findPatternMany"
-//        | Some range ->
-//            Ok <| boundedFindPatternMany search extractRegion range
-
-
-
-
-
-/// Return the table containing needle.
-//let containingTable (needle:Region) : DocExtractor<TableAnchor> = 
-//    DocExtractor <| fun doc pos -> 
-//        let rec work (ix:TableAnchor) = 
-//            if ix.TableIndex <= doc.Tables.Count then 
-//                let table = doc.Tables.Item (ix.TableIndex)
-//                if isSubregionOf (extractRegion table.Range) needle then
-//                    Ok ix
-//                else work ix.Next
-//            else
-//                Err "containingTable - needle out of range"
-//        match dict.GetRegion focus doc with
-//        | None -> Err "containingTable"
-//        | Some focus1 ->
-//            if isSubregionOf focus1 needle then
-//                work TableAnchor.First
-//            else
-//                Err "containingTable - needle not in focus"
-
-
-/// Return the cell containing needle.
-//let containingCell (needle:Region) : DocExtractor<CellAnchor> = 
-//    let testCell (cell:Word.Cell) : bool = 
-//            isSubregionOf (extractRegion cell.Range) needle
-//    docExtract { 
-//        let! tableAnchor = containingTable needle
-//        let! table = getTable tableAnchor
-//        match tryFindCell testCell table with 
-//        | Some cell -> 
-//            return { 
-//                TableIx = tableAnchor;
-//                CellIx = { RowIx = cell.RowIndex; ColumnIx = cell.ColumnIndex }
-//            }
-//        | None -> throwError "containingCell - no match" |> ignore
-//        }
-
-    
-/// Get the tableHeader region.        
-//let tableHeader (anchor:TableAnchor) : DocExtractor<Region> = 
-//    getCell (firstCell anchor) |>>> fun (cell:Word.Cell) -> extractRegion cell.Range
-
-
-
-// *************************************
-// Navigation
-
-/// Get the table by index - must be in focus.
-/// Note - indexing is from 1.
-//let getTableByIndex (ix:int) : DocExtractor<TableAnchor> = 
-//    let anchor = { TableIndex =  ix }
-//    assertTableInFocus anchor >>>. sreturn anchor
-
-
-
-/// Get the table containing the supplied cell.
-//let parentTable (cell:CellAnchor) : DocExtractor<TableAnchor> = 
-//    (assertTableInFocus cell.TableAnchor >>>. sreturn cell.TableAnchor) <&?> "parentTable - failed"
-
-
-
-/// Get the next table, will fail if next table is not in focus
-//let nextTable (anchor:TableAnchor) : DocExtractor<TableAnchor> = 
-//    (assertTableInFocus anchor.Next >>>. sreturn anchor.Next) <&?> "nextTable - failed" 
-
-
-
-
-// *************************************
-// Find tables and within tables
-
-        
-//type private Finder<'a> = Word.Table -> option<'a>
-
-//let exactFinder (search:string) (matchCase:bool) : Finder<Region> = 
-//    fun (table:Word.Table) -> boundedFind1 search matchCase extractRegion table.Range
-
-    
-//let patternFinder (search:string) : Finder<Region> = 
-//    fun (table:Word.Table) -> boundedFindPattern1 search extractRegion table.Range
-
-//type private FinderMany<'a> = Word.Table -> 'a list
-
-//let exactFinderMany (search:string) (matchCase:bool) : FinderMany<Region> = 
-//    fun (table:Word.Table) -> boundedFindMany search matchCase extractRegion table.Range
-    
-//let patternFinderMany (search:string) : FinderMany<Region> = 
-//    fun (table:Word.Table) -> boundedFindPatternMany search extractRegion table.Range
-    
-
-
-//let private findTableSingle (finder:Finder<'a>) : DocExtractor<TableAnchor> =
-//    DocExtractor <| fun doc pos -> 
-//        let tcount = doc.Tables.Count
-//        let rec work (ix:TableAnchor) : Result<TableAnchor> = 
-//            if ix.Index > tcount then
-//                Err "findTableSingle - not found"
-//            else
-//                 Rather than fail if not in focus, move next instead 
-//                 otherwise fail would short-curcuit.
-//                 Note this masks index failures, hence tcount above.
-//                match apply1 (getTable ix) doc pos with
-//                | Err msg -> work ix.Next
-//                | Ok table -> 
-//                    match finder table with
-//                    | None -> work ix.Next
-//                    | Some _ -> Ok ix
-//        work TableAnchor.First
-
-
-//let private findTableMultiple (finder:Finder<'a>) : DocExtractor<TableAnchor list> =
-//    DocExtractor <| fun doc pos -> 
-//        let tcount = doc.Tables.Count
-//        let rec work (ix:TableAnchor) (ac: TableAnchor list) : Result<TableAnchor list> = 
-//            if ix.Index > tcount then
-//                Ok <| List.rev ac 
-//            else
-//                 Rather than fail if not in focus, move next instead 
-//                 otherwise fail would short-curcuit.
-//                 Note this masks index failures, hence tcount above.
-//                match apply1 (getTable ix) doc pos with
-//                | Err msg -> work ix.Next ac
-//                | Ok table-> 
-//                    match finder table with
-//                    | None -> work ix.Next ac
-//                    | Some _ -> work ix.Next (ix::ac)
-//        work TableAnchor.First []
-
-/// Find the first table containing the search text.
-//let findTable (search:string) (matchCase:bool) : DocExtractor<TableAnchor> = 
-//    findTableSingle (exactFinder search matchCase)
-
-/// Find the first table where the search pattern matches.
-//let findTableByPattern (search:string) : DocExtractor<TableAnchor> = 
-//    findTableSingle (patternFinder search)
-
-/// Find all tables containing the search text.
-//let findTables (search:string) (matchCase:bool) : DocExtractor<TableAnchor list> = 
-//    findTableMultiple (exactFinder search matchCase)
-
-/// Find all tables where the search pattern matches.
-//let findTablesByPattern (search:string) : DocExtractor<TableAnchor list> = 
-//    findTableMultiple (patternFinder search)
-
+let findPatternMany (search:string) : DocExtractor<Region list> =
+    DocExtractor <| fun doc pos  -> 
+        let range =  getRangeToEnd pos doc 
+        let finds = boundedFindPatternMany search extractRegion range
+        Ok (pos,finds)
 
 

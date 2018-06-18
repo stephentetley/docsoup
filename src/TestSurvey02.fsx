@@ -23,7 +23,7 @@ open SurveyExtractor02
 
 let processSurvey (docPath:string) : unit = 
     printfn "Doc: %s" docPath
-    runOnFileE extractSiteDetails docPath |> printfn "%A"
+    runOnFileE parseSurvey docPath |> printfn "%A"
 
 
 let processSite(folderPath:string) : unit  =

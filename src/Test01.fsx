@@ -32,9 +32,20 @@ let test03 () =
     let proc : DocSoup<_,_> = findTextMany "Discharge" true
     runOnFileE proc testDoc |> List.iter (printfn "%A")
 
-//let test04 () = 
-//    let proc : DocSoup<_,_> = tableAreas
-//    runOnFileE proc testDoc |> Seq.iter (printfn "%A")
+// Does sepBy (optionally) terminate?
+let test04 () = 
+    let parser = 
+        parse { 
+            let! nums = sepBy digit (pchar ';') 
+            let! letter1 = letter
+            return (nums,letter1)
+        }
+    match run parser "1;2;3;4;X" with
+    | Success(a, _, _) -> 
+        printfn "Success %A" a
+    | Failure(_,_,_) -> 
+        printfn "sepBy is proper sep (not endBy)"
+        run parser "1;2;3;4X" |> printfn "Second attempt: %A"
 
 let test05 () = 
     let proc : DocSoup<_,_> = findPattern "D??charge"

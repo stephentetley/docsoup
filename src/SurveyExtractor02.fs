@@ -170,24 +170,22 @@ let extractUltrasonicSensorInfo1 : TableExtractor<UltrasonicSensorInfo> =
             GridRef = "" }
     }
 
-//let extractUltrasonicInfo1 (levelTable:TableAnchor) : DocExtractor<UltrasonicInfo> = 
-//    docSoup {
-//        let! monitor = 
-//            focusTable levelTable extractUltrasonicMonitorInfo1
-//        let! sensor = 
-//            focusTableM (nextTable levelTable) extractUltrasonicSensorInfo1
-//        return { 
-//            MonitorInfo = monitor
-//            SensorInfo = sensor } 
-//    }
+let extractUltrasonicInfo1 : DocExtractor<UltrasonicInfo> = 
+    docExtract { 
+        let! monitor = nextTable extractUltrasonicMonitorInfo1
+        let! sensor = nextTable extractUltrasonicSensorInfo1
+        return { 
+            MonitorInfo = monitor
+            SensorInfo = sensor } 
+    }
 
 
-//let extractUltrasonicInfos : DocExtractor<UltrasonicInfo list>= 
-//    let dict: MultiTableParser<UltrasonicInfo> = 
-//        { GetAnchors = findTables "Ultrasonic Level Control" true;
-//          TableParser = extractUltrasonicMonitorInfo1;
-//          TestNotEmpty = fun (info:UltrasonicInfo) -> not info.isEmpty }
-//    parseMultipleTables dict <&?> "UltrasonicInfos"
+let sectionUltrasonics : DocExtractor<UltrasonicInfo list>= 
+    docExtract { 
+        do! advanceM (findTextStart "Section 4" false)
+        let! outfalls = many extractUltrasonicInfo1
+        return outfalls
+    }
 
 let extractOverflowType : TableExtractor<OverflowType> =  
     tableExtract { 
@@ -220,12 +218,12 @@ let extractChamberInfo1 : TableExtractor<ChamberInfo> =
     }
 
 
-//let extractChamberInfos : DocExtractor<ChamberInfo list>= 
-//    let dict: MultiTableParser<ChamberInfo> = 
-//        { GetAnchors = findTables "Chamber Measurement" true;
-//          TableParser = extractChamberInfo1;
-//          TestNotEmpty = fun (info:ChamberInfo) -> not info.isEmpty }
-//    parseMultipleTables dict <&?> "ChamberInfos"
+let sectionChambers : DocExtractor<ChamberInfo list>= 
+    docExtract { 
+        do! advanceM (findTextStart "Section 4" false)
+        let! outfalls = many (nextTable extractChamberInfo1)
+        return outfalls
+    }
 
 let extractOutfallInfo1 : TableExtractor<OutfallInfo> = 
     tableExtract { 
@@ -240,19 +238,19 @@ let extractOutfallInfo1 : TableExtractor<OutfallInfo> =
     }
 
 
-//// Note table parser would find finds "OutFall Photos" if we just looked for 
-//// "Outfall".
-//let extractOutfallInfos : DocExtractor<OutfallInfo list>= 
-//    let dict: MultiTableParser<OutfallInfo> = 
-//        { GetAnchors = findTables "Outfall Proven" false
-//          TableParser = extractOutfallInfo1
-//          TestNotEmpty = fun (info:OutfallInfo) -> not info.isEmpty }
-//    parseMultipleTables dict <&?> "OutfallInfos"
+/// Note table parser would find finds "OutFall Photos" if we just looked for 
+/// "Outfall".
+let sectionOutfalls : DocExtractor<OutfallInfo list>= 
+    docExtract { 
+        do! advanceM (findTextStart "Section 5" false)
+        let! outfalls = many (nextTable extractOutfallInfo1)
+        return outfalls
+    }
 
 /// Single table - Title (1,1) = "Scope of Works", data in cell (r3,c1):
 let scopeOfWorks : DocExtractor<string> = 
     docExtract { 
-        do! advanceM (findText "Section 6" false)
+        do! advanceM (findTextStart "Section 6" false)
         let! text           = 
             sw "scope-of-works"       <| nextTable (focusCellM (getCellByIndex 3 1) <| getCellText)
         return text
@@ -262,7 +260,7 @@ let scopeOfWorks : DocExtractor<string> =
 /// Single table - Title (1,1) = "Appendix", data in cell (r2,c1):
 let appendix : DocExtractor<string> =  
     docExtract { 
-        do! advanceM (findText "Section 7" false)
+        do! advanceM (findTextStart "Section 7" false)
         let! text           = 
             sw "appendix"       <| nextTable (focusCellM (getCellByIndex 2 1) <| getCellText)
         return text
@@ -281,7 +279,7 @@ let section1 : DocExtractor<SiteInfo * SurveyInfo> =
 
 let section2 : DocExtractor<OutstationInfo> = 
     docExtract { 
-        do! advanceM (findText "Section 2" false)
+        do! advanceM (findTextStart "Section 2" false)
         let! outstation     = 
             sw "outstation"         <| nextTable extractOutstationInfo
         return outstation
@@ -294,9 +292,9 @@ let parseSurvey : DocExtractor<Survey> =
 
         let! outstation             = section2
 
-        let! ultrasonics    = sw "ultrasonics"      extractUltrasonicInfos
-        let! chambers       = sw "chambers"         extractChamberInfos
-        let! outfalls       = sw "outfalls"         extractOutfallInfos
+        let! ultrasonics    = sw "ultrasonics"      sectionUltrasonics
+        let! chambers       = sw "chambers"         sectionChambers
+        let! outfalls       = sw "outfalls"         sectionOutfalls
         let! scopeText      = scopeOfWorks
         let! appendixText   = appendix
         return { 
