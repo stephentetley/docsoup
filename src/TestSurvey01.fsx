@@ -11,8 +11,10 @@ open System.IO
 
 
 #load @"DocSoup\Base.fs"
-#load @"DocSoup\DocMonad.fs"
-open DocSoup.DocMonad
+#load @"DocSoup\TableExtractor.fs"
+#load @"DocSoup\DocExtractor.fs"
+open DocSoup.TableExtractor
+open DocSoup.DocExtractor
 
 #load @"SurveySyntax.fs"
 #load @"SurveyExtractor.fs"
