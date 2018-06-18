@@ -7,6 +7,7 @@ open Microsoft.Office.Interop
 #I @"..\packages\FParsec.1.0.3\lib\portable-net45+win8+wp8+wpa81"
 #r "FParsec"
 #r "FParsecCS"
+open FParsec
 
 #load @"DocSoup\Base.fs"
 #load @"DocSoup\TableExtractor.fs"
@@ -127,4 +128,18 @@ let test05 () =
     printfn "%A" first.Next.Next
 
 
+// Does sepBy (optionally) terminate?
+let testFParsec01 () = 
+    let parser = 
+        FParsec.Primitives.parse { 
+            let! nums = FParsec.Primitives.sepBy digit (pchar ';') 
+            let! letter1 = letter
+            return (nums,letter1)
+        }
+    match FParsec.CharParsers.run parser "1;2;3;4;X" with
+    | Success(a, _, _) -> 
+        printfn "Success %A" a
+    | Failure(_,_,_) -> 
+        printfn "sepBy is proper sep (not endBy)"
+        FParsec.CharParsers.run parser "1;2;3;4X" |> printfn "Second attempt: %A"
 

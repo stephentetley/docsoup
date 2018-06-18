@@ -55,11 +55,9 @@
     <Compile Include="DocSoup\Base.fs" />
     <Compile Include="DocSoup\TableExtractor.fs" />
     <Compile Include="DocSoup\DocExtractor.fs" />
-    <Compile Include="DocSoup\DocMonad.fs" />
     <Compile Include="SurveySyntax.fs" />
     <Compile Include="SurveyExtractor.fs" />
     <None Include="TestSurvey01.fsx" />
-    <None Include="Test01.fsx" />
     <None Include="Temp01.fsx" />
     <Content Include="packages.config" />
     <COMReference Include="Microsoft Office 16.0 Object Library">
