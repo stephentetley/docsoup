@@ -12,9 +12,9 @@ open System.IO
 
 #load @"DocSoup\Base.fs"
 #load @"DocSoup\TableExtractor1.fs"
-#load @"DocSoup\DocExtractor.fs"
+#load @"DocSoup\TablesExtractor.fs"
 open DocSoup.TableExtractor1
-open DocSoup.DocExtractor
+open DocSoup.TablesExtractor
 
 #load @"SurveySyntax.fs"
 #load @"SurveyExtractor.fs"

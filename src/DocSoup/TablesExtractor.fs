@@ -19,10 +19,10 @@ type Result<'a> =
     | Ok of TableIx * 'a
 
 let private resultConcat (source:Result<'a> list) : Result<'a list> = 
-    let rec work pos ac xs = 
+    let rec work ix ac xs = 
         match xs with
-        | [] -> Ok (pos,List.rev ac)
-        | Ok (pos1,a) :: ys -> work (max pos pos1) (a::ac) ys
+        | [] -> Ok (ix,List.rev ac)
+        | Ok (ix1,a) :: ys -> work (max ix ix1) (a::ac) ys
         | Err msg :: _ -> Err msg
     work 1 [] source
 
@@ -35,19 +35,19 @@ type TablesExtractor<'a> =
 
 let inline private apply1 (ma: TablesExtractor<'a>) 
                             (tables: Word.Table []) 
-                            (pos: TableIx) : Result<'a>= 
-    let (TablesExtractor f) = ma in f tables pos
+                            (ix: TableIx) : Result<'a>= 
+    let (TablesExtractor f) = ma in f tables ix
 
 let inline treturn (x:'a) : TablesExtractor<'a> = 
-    TablesExtractor <| fun _ pos -> Ok (pos, x)
+    TablesExtractor <| fun _ ix -> Ok (ix, x)
 
 
 let inline private bindM (ma:TablesExtractor<'a>) 
                             (f :'a -> TablesExtractor<'b>) : TablesExtractor<'b> =
-    TablesExtractor <| fun doc pos -> 
-        match apply1 ma doc pos with
+    TablesExtractor <| fun tables ix -> 
+        match apply1 ma tables ix with
         | Err msg -> Err msg
-        | Ok (pos1,a) -> apply1 (f a) doc pos1
+        | Ok (ix1,a) -> apply1 (f a) tables ix1
 
 let inline tzero () : TablesExtractor<'a> = 
     TablesExtractor <| fun _ _ -> Err "tzero"
@@ -55,10 +55,10 @@ let inline tzero () : TablesExtractor<'a> =
 
 let inline private combineM (ma:TablesExtractor<unit>) 
                                 (mb:TablesExtractor<unit>) : TablesExtractor<unit> = 
-    TablesExtractor <| fun doc pos -> 
-        match apply1 ma doc pos with
+    TablesExtractor <| fun tables ix -> 
+        match apply1 ma tables ix with
         | Err msg -> Err msg
-        | Ok (pos1,a) -> apply1 mb doc pos1
+        | Ok (ix1,a) -> apply1 mb tables ix1
 
 
 let inline private  delayM (fn:unit -> TablesExtractor<'a>) : TablesExtractor<'a> = 
@@ -76,7 +76,7 @@ type TablesExtractorBuilder() =
 
 // Prefer "parse" to "parser" for the _Builder instance
 
-let (tablesExtract:TablesExtractorBuilder) = new TablesExtractorBuilder()
+let (parseTables:TablesExtractorBuilder) = new TablesExtractorBuilder()
 
 // *************************************
 // Errors
@@ -85,10 +85,10 @@ let throwError (msg:string) : TablesExtractor<'a> =
     TablesExtractor <| fun _ _ -> Err msg
 
 let swapError (msg:string) (ma:TablesExtractor<'a>) : TablesExtractor<'a> = 
-    TablesExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
+    TablesExtractor <| fun tables ix ->
+        match apply1 ma tables ix with
         | Err _ -> Err msg
-        | Ok (pos1,a) -> Ok (pos1,a)
+        | Ok (ix1,a) -> Ok (ix1,a)
 
 let (<&?>) (ma:TablesExtractor<'a>) (msg:string) : TablesExtractor<'a> = 
     swapError msg ma
@@ -106,10 +106,10 @@ let (>>>=) (ma:TablesExtractor<'a>)
 
 // Common monadic operations
 let fmapM (fn:'a -> 'b) (ma:TablesExtractor<'a>) : TablesExtractor<'b> = 
-    TablesExtractor <| fun doc pos -> 
-       match apply1 ma doc pos with
+    TablesExtractor <| fun tables ix -> 
+       match apply1 ma tables ix with
        | Err msg -> Err msg
-       | Ok (pos1,a) -> Ok (pos1, fn a)
+       | Ok (ix1,a) -> Ok (ix1, fn a)
 
 // This is the nub of embedding FParsec - name clashes.
 // We avoid them by using longer names in DocSoup.
@@ -128,7 +128,7 @@ let liftM (fn:'a -> 'x) (ma:TablesExtractor<'a>) : TablesExtractor<'x> =
 
 let liftM2 (fn:'a -> 'b -> 'x) 
             (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) : TablesExtractor<'x> = 
-    tablesExtract { 
+    parseTables { 
         let! a = ma
         let! b = mb
         return (fn a b)
@@ -137,7 +137,7 @@ let liftM2 (fn:'a -> 'b -> 'x)
 let liftM3 (fn:'a -> 'b -> 'c -> 'x) 
             (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) 
             (mc:TablesExtractor<'c>) : TablesExtractor<'x> = 
-    tablesExtract { 
+    parseTables { 
         let! a = ma
         let! b = mb
         let! c = mc
@@ -147,7 +147,7 @@ let liftM3 (fn:'a -> 'b -> 'c -> 'x)
 let liftM4 (fn:'a -> 'b -> 'c -> 'd -> 'x) 
             (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) 
             (mc:TablesExtractor<'c>) (md:TablesExtractor<'d>) : TablesExtractor<'x> = 
-    tablesExtract { 
+    parseTables { 
         let! a = ma
         let! b = mb
         let! c = mc
@@ -160,7 +160,7 @@ let liftM5 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'x)
             (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) 
             (mc:TablesExtractor<'c>) (md:TablesExtractor<'d>) 
             (me:TablesExtractor<'e>) : TablesExtractor<'x> = 
-    tablesExtract { 
+    parseTables { 
         let! a = ma
         let! b = mb
         let! c = mc
@@ -173,7 +173,7 @@ let liftM6 (fn:'a -> 'b -> 'c -> 'd -> 'e -> 'f -> 'x)
             (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) 
             (mc:TablesExtractor<'c>) (md:TablesExtractor<'d>) 
             (me:TablesExtractor<'e>) (mf:TablesExtractor<'f>) : TablesExtractor<'x> = 
-    tablesExtract { 
+    parseTables { 
         let! a = ma
         let! b = mb
         let! c = mc
@@ -232,10 +232,10 @@ let pipeM6 (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>)
 
 /// Left biased choice, if ``ma`` succeeds return its result, otherwise try ``mb``.
 let alt (ma:TablesExtractor<'a>) (mb:TablesExtractor<'a>) : TablesExtractor<'a> = 
-    TablesExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
-        | Err _ -> apply1 mb doc pos
-        | Ok (pos1,a) -> Ok (pos1,a)
+    TablesExtractor <| fun tables ix ->
+        match apply1 ma tables ix with
+        | Err _ -> apply1 mb tables ix
+        | Ok (ix1,a) -> Ok (ix1,a)
 
 let (<||>) (ma:TablesExtractor<'a>) (mb:TablesExtractor<'a>) : TablesExtractor<'a> = 
     alt ma mb <&?> "(<||>)"
@@ -243,7 +243,7 @@ let (<||>) (ma:TablesExtractor<'a>) (mb:TablesExtractor<'a>) : TablesExtractor<'
 
 // Haskell Applicative's (<*>)
 let apM (mf:TablesExtractor<'a ->'b>) (ma:TablesExtractor<'a>) : TablesExtractor<'b> = 
-    tablesExtract { 
+    parseTables { 
         let! fn = mf
         let! a = ma
         return (fn a) 
@@ -258,7 +258,7 @@ let (<&&>) (fn:'a -> 'b) (ma:TablesExtractor<'a>) :TablesExtractor<'b> =
 
 /// Perform two actions in sequence. Ignore the results of the second action if both succeed.
 let seqL (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) : TablesExtractor<'a> = 
-    tablesExtract { 
+    parseTables { 
         let! a = ma
         let! b = mb
         return a
@@ -266,7 +266,7 @@ let seqL (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) : TablesExtractor<'a>
 
 /// Perform two actions in sequence. Ignore the results of the first action if both succeed.
 let seqR (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) : TablesExtractor<'b> = 
-    tablesExtract { 
+    parseTables { 
         let! a = ma
         let! b = mb
         return b
@@ -280,57 +280,27 @@ let (>>>.) (ma:TablesExtractor<'a>) (mb:TablesExtractor<'b>) : TablesExtractor<'
 
 
 let mapM (p: 'a -> TablesExtractor<'b>) (source:'a list) : TablesExtractor<'b list> = 
-    TablesExtractor <| fun doc pos0 -> 
-        let rec work pos ac ys = 
+    TablesExtractor <| fun tables ix0 -> 
+        let rec work ix ac ys = 
             match ys with
-            | [] -> Ok (pos, List.rev ac)
+            | [] -> Ok (ix, List.rev ac)
             | z :: zs -> 
-                match apply1 (p z) doc pos with
+                match apply1 (p z) tables ix with
                 | Err msg -> Err msg
-                | Ok (pos1,ans) -> work pos1 (ans::ac) zs
-        work pos0  [] source
+                | Ok (ix1,ans) -> work ix1 (ans::ac) zs
+        work ix0  [] source
 
 let forM (source:'a list) (p: 'a -> TablesExtractor<'b>) : TablesExtractor<'b list> = 
     mapM p source
 
-
-
-
-/// The action is expected to return ``true`` or `false``- if it throws 
-/// an error then the error is passed upwards.
-let findM  (action: 'a -> TablesExtractor<bool>) (source:'a list) : TablesExtractor<'a> = 
-    TablesExtractor <| fun doc pos0 -> 
-        let rec work pos ys = 
-            match ys with
-            | [] -> Err "findM - not found"
-            | z :: zs -> 
-                match apply1 (action z) doc pos with
-                | Err msg -> Err msg
-                | Ok (pos1,ans) -> if ans then Ok (pos1,z) else work pos1 zs
-        work pos0 source
-
-/// The action is expected to return ``true`` or `false``- if it throws 
-/// an error then the error is passed upwards.
-let tryFindM (action: 'a -> TablesExtractor<bool>) 
-                (source:'a list) : TablesExtractor<'a option> = 
-    TablesExtractor <| fun doc pos0 -> 
-        let rec work pos ys = 
-            match ys with
-            | [] -> Ok (pos0,None)
-            | z :: zs -> 
-                match apply1 (action z) doc pos with
-                | Err msg -> Err msg
-                | Ok (pos1,ans) -> if ans then Ok (pos1, Some z) else work pos1 zs
-        work pos0 source
-
     
 let optionToFailure (ma:TablesExtractor<option<'a>>) 
                     (errMsg:string) : TablesExtractor<'a> = 
-    TablesExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
+    TablesExtractor <| fun tables ix ->
+        match apply1 ma tables ix with
         | Err msg -> Err msg
         | Ok (_,None) -> Err errMsg
-        | Ok (pos1, Some a) -> Ok (pos1,a)
+        | Ok (ix1, Some a) -> Ok (ix1,a)
 
 
 
@@ -338,50 +308,50 @@ let optionToFailure (ma:TablesExtractor<option<'a>>)
 
 /// Optionally parses. When the parser fails return None and don't move the cursor position.
 let optional (ma:TablesExtractor<'a>) : TablesExtractor<'a option> = 
-    TablesExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
-        | Err _ -> Ok (pos,None)
-        | Ok (pos1,a) -> Ok (pos1,Some a)
+    TablesExtractor <| fun tables ix ->
+        match apply1 ma tables ix with
+        | Err _ -> Ok (ix,None)
+        | Ok (ix1,a) -> Ok (ix1,Some a)
 
 
 let optionalz (ma:TablesExtractor<'a>) : TablesExtractor<unit> = 
-    TablesExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
-        | Err _ -> Ok (pos, ())
-        | Ok (pos1,_) -> Ok (pos1, ())
+    TablesExtractor <| fun tables ix ->
+        match apply1 ma tables ix with
+        | Err _ -> Ok (ix, ())
+        | Ok (ix1,_) -> Ok (ix1, ())
 
 /// Turn an operation into a boolean, when the action is success return true 
 /// when it fails return false
 let boolify (ma:TablesExtractor<'a>) : TablesExtractor<bool> = 
-    TablesExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
-        | Err _ -> Ok (pos,false)
-        | Ok (pos1,_) -> Ok (pos1,true)
+    TablesExtractor <| fun tables ix ->
+        match apply1 ma tables ix with
+        | Err _ -> Ok (ix,false)
+        | Ok (ix1,_) -> Ok (ix1,true)
 
 // *************************************
 // Parser combinators
 
 /// End of document?
 let eof : TablesExtractor<unit> =
-    TablesExtractor <| fun tables pos ->
-        if pos >= tables.Length then 
-            Ok (pos, ())
+    TablesExtractor <| fun tables ix ->
+        if ix >= tables.Length then 
+            Ok (ix, ())
         else
             Err "eof (not-at-end)"
 
 
 /// Parses p without consuming input
 let lookahead (ma:TablesExtractor<'a>) : TablesExtractor<'a> =
-    TablesExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
+    TablesExtractor <| fun tables ix ->
+        match apply1 ma tables ix with
         | Err msg -> Err msg
-        | Ok (_,a) -> Ok (pos,a)
+        | Ok (_,a) -> Ok (ix,a)
 
 
 
 let between (popen:TablesExtractor<_>) (pclose:TablesExtractor<_>) 
             (ma:TablesExtractor<'a>) : TablesExtractor<'a> =
-    tablesExtract { 
+    parseTables { 
         let! _ = popen
         let! ans = ma
         let! _ = pclose
@@ -390,15 +360,15 @@ let between (popen:TablesExtractor<_>) (pclose:TablesExtractor<_>)
 
 
 let many (ma:TablesExtractor<'a>) : TablesExtractor<'a list> = 
-    TablesExtractor <| fun doc pos0 ->
-        let rec work pos ac = 
-            match apply1 ma doc pos with
-            | Err _ -> Ok (pos, List.rev ac)
-            | Ok (pos1,a) -> work pos1 (a::ac)
-        work pos0 []
+    TablesExtractor <| fun tables ix0 ->
+        let rec work ix ac = 
+            match apply1 ma tables ix with
+            | Err _ -> Ok (ix, List.rev ac)
+            | Ok (ix1,a) -> work ix1 (a::ac)
+        work ix0 []
 
 let many1 (ma:TablesExtractor<'a>) : TablesExtractor<'a list> = 
-    tablesExtract { 
+    parseTables { 
         let! a1 = ma
         let! rest = many ma
         return (a1::rest) 
@@ -409,7 +379,7 @@ let skipMany (ma:TablesExtractor<'a>) : TablesExtractor<unit> =
 
 let sepBy1 (ma:TablesExtractor<'a>) 
             (sep:TablesExtractor<_>) : TablesExtractor<'a list> = 
-    tablesExtract { 
+    parseTables { 
         let! a1 = ma
         let! rest = many (sep >>>. ma) 
         return (a1::rest)
@@ -421,15 +391,15 @@ let sepBy (ma:TablesExtractor<'a>)
 
 let manyTill (ma:TablesExtractor<'a>) 
                 (terminator:TablesExtractor<_>) : TablesExtractor<'a list> = 
-    TablesExtractor <| fun doc pos0 ->
-        let rec work pos ac = 
-            match apply1 terminator doc pos with
+    TablesExtractor <| fun tables ix0 ->
+        let rec work ix ac = 
+            match apply1 terminator tables ix with
             | Err msg -> 
-                match apply1 ma doc pos with
+                match apply1 ma tables ix with
                 | Err msg -> Err msg
-                | Ok (pos1,a) -> work pos1 (a::ac) 
-            | Ok (pos1,_) -> Ok(pos1, List.rev ac)
-        work pos0 []
+                | Ok (ix1,a) -> work ix1 (a::ac) 
+            | Ok (ix1,_) -> Ok(ix1, List.rev ac)
+        work ix0 []
 
 let manyTill1 (ma:TablesExtractor<'a>) 
                 (terminator:TablesExtractor<_>) : TablesExtractor<'a list> = 
@@ -472,82 +442,19 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 
 
 //// *************************************
-//// Run tableExtractor
+//// Run tableExtractor1
 
-//let withTable (anchor:TableAnchor) (ma:TablesExtractor1<'a>) : TablesExtractor<'a> = 
-//    TablesExtractor <| fun doc _ ->
-//        try 
-//            let table:Word.Table = doc.Tables.Item(anchor.Index)
-//            match runTablesExtractor1 (ma:TablesExtractor1<'a>) table with
-//            | T1Err msg -> Err msg
-//            | T1Ok a -> 
-//                let pos1 = table.Range.End + 1
-//                Ok (pos1,a)
-//        with
-//        | _ -> Err "withTable" 
+let parseTable (ma:TableExtractor1<'a>) : TablesExtractor<'a> = 
+    TablesExtractor <| fun tables ix ->
+        try 
+            let table:Word.Table = tables.[ix]
+            match runTableExtractor1 ma table with
+            | T1Err msg -> Err msg
+            | T1Ok a -> Ok (ix+1,a)
+        with
+        | _ -> Err "parseTable" 
 
         
-//let withTableM (anchorQuery:TablesExtractor<TableAnchor>) (ma:TablesExtractor1<'a>) : TablesExtractor<'a> = 
-//    anchorQuery >>>= fun a -> withTable a ma 
-
-//// Now we have a cursor we can have a nextTable function.
-//let askNextTable : TablesExtractor<TableAnchor> = 
-//    TablesExtractor <| fun doc pos ->
-//        try 
-//            let needle = { RegionStart = pos; RegionEnd = pos+1 }
-//            let rec work (ix:TableAnchor) = 
-//                if ix.TableIndex <= doc.Tables.Count then 
-//                    let table = doc.Tables.Item (ix.TableIndex)
-//                    let region = extractRegion table.Range
-//                    if region.RegionStart >= pos then 
-//                        Ok (pos,ix)
-//                    else work ix.Next
-//                else
-//                    Err "askNextTable (no next table)"
-//            work TableAnchor.First
-//        with
-//        | _ -> Err "askNextTable" 
-
-///// This is the wrong abstraction / traversal strategy
-///// We should be using the index into the array of tables in a document.
-
-
-///// Note - this is unguarded, use with care in many, many1 etc. 
-//let nextTable (ma:TablesExtractor1<'a>) : TablesExtractor<'a> = 
-//    withTableM askNextTable ma
-
-//// *************************************
-//// String level parsing with FParsec
-
-//// TODO - FParsec will have to run in regions so that we have a
-//// stopping boundary.
-
-//// We expect string level parsers might fail. 
-//// Use this with caution or use execFParsecFallback.
-////let execFParsec (parser:ParsecParser<'a>) : TablesExtractor<'a> = 
-////    TablesExtractor <| fun doc pos ->
-////        match dict.GetText focus doc with
-////        | None -> Err "execFParsec - no input text"
-////        | Some text -> 
-////            let name = doc.Name  
-////            match runParserOnString parser () name text with
-////            | Success(ans,_,_) -> Ok ans
-////            | Failure(msg,_,_) -> Err msg
-
-
-
-//// Returns fallback text if FParsec fails.
-////let execFParsecFallback (parser:ParsecParser<'a>) : TablesExtractor<FParsecFallback<'a>> = 
-////    TablesExtractor <| fun doc pos ->
-////        match dict.GetText focus doc with
-////        | None -> Ok <| FallbackText ""
-////        | Some text -> 
-////            let name = doc.Name  
-////            match runParserOnString parser () name text with
-////            | Success(ans,_,_) -> Ok <| FParsecOk ans
-////            | Failure(msg,_,_) -> Ok <| FallbackText text
-
-
 
 
 //// *************************************
@@ -566,8 +473,8 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 
 //let withSearchAnchor (anchor:SearchAnchor) 
 //                        (ma:TablesExtractor<'a>) : TablesExtractor<'a> = 
-//    TablesExtractor <| fun doc pos  -> 
-//        if anchor.Position > pos then   
+//    TablesExtractor <| fun doc ix  -> 
+//        if anchor.Position > ix then   
 //           apply1 ma doc anchor.Position
 //        else
 //           Err "withSearchAnchor"
@@ -581,10 +488,10 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 
 
 //let findText (search:string) (matchCase:bool) : TablesExtractor<Region> =
-//    TablesExtractor <| fun doc pos  -> 
-//        let range =  getRangeToEnd pos doc 
+//    TablesExtractor <| fun doc ix  -> 
+//        let range =  getRangeToEnd ix doc 
 //        match boundedFind1 search matchCase extractRegion range with
-//        | Some region -> Ok (pos, region)
+//        | Some region -> Ok (ix, region)
 //        | None -> Err <| sprintf "findText - '%s' not found" search
 
 //let findTextStart (search:string) (matchCase:bool) : TablesExtractor<SearchAnchor> =
@@ -595,10 +502,10 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 
 ///// Case sensitivity always appears to be true for Wildcard matches.
 //let findPattern (search:string) : TablesExtractor<Region> =
-//    TablesExtractor <| fun doc pos  -> 
-//        let range =  getRangeToEnd pos doc 
+//    TablesExtractor <| fun doc ix  -> 
+//        let range =  getRangeToEnd ix doc 
 //        match boundedFindPattern1 search extractRegion range with
-//        | Some region -> Ok (pos, region)
+//        | Some region -> Ok (ix, region)
 //        | None -> Err <| sprintf "findPattern - '%s' not found" search
         
 //let findPatternStart (search:string)  : TablesExtractor<SearchAnchor> =
@@ -608,106 +515,14 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 //    findPattern search |>>> endOfRegion
 
 //let findTextMany (search:string) (matchCase:bool) : TablesExtractor<Region list> =
-//    TablesExtractor <| fun doc pos  -> 
-//        let range =  getRangeToEnd pos doc 
+//    TablesExtractor <| fun doc ix  -> 
+//        let range =  getRangeToEnd ix doc 
 //        let finds = boundedFindMany search matchCase extractRegion range
-//        Ok (pos,finds)
+//        Ok (ix,finds)
 
 ///// Case sensitivity always appears to be true for Wildcard matches.
 //let findPatternMany (search:string) : TablesExtractor<Region list> =
-//    TablesExtractor <| fun doc pos -> 
-//        let range =  getRangeToEnd pos doc 
+//    TablesExtractor <| fun doc ix -> 
+//        let range =  getRangeToEnd ix doc 
 //        let finds = boundedFindPatternMany search extractRegion range
-//        Ok (pos,finds)
-
-
-//// *************************************
-//// Character level parsers
-
-//let whiteSpace : TablesExtractor<string> = 
-//    TablesExtractor <| fun doc pos -> 
-//        try 
-//            let range = doc.Range(Start=rbox pos)
-//            let regMatch = Regex.Match(range.Text, @"^[\p{C}-[\r\n]]+")
-//            if regMatch.Success then 
-//                let pos1 = pos + regMatch.Length + 1
-//                Ok (pos1, regMatch.Value)
-//            else 
-//                Ok (pos,"")
-//        with
-//        | _ -> Err "whiteSpace"
-
-//let whiteSpace1 : TablesExtractor<string> = 
-//    TablesExtractor <| fun doc pos -> 
-//        try 
-//            let range = doc.Range(Start=rbox pos)
-//            let regMatch = Regex.Match(range.Text, @"^[\p{C}-[\r\n]]+")
-//            if regMatch.Success then 
-//                let pos1 = pos + regMatch.Length + 1
-//                Ok (pos1, regMatch.Value)
-//            else 
-//                Err "whiteSpace1"
-//        with
-//        | _ -> Err "whiteSpace1"
-
-
-///// This ignores control characters.
-//let internal removeControlPrefix : TablesExtractor<unit> = 
-//    TablesExtractor <| fun doc pos -> 
-//        try 
-//            let range = doc.Range(Start=rbox pos)
-//            let regMatch = Regex.Match(range.Text, @"\A[\p{C}]+")
-//            if regMatch.Success then 
-//                let pos1 = pos + regMatch.Length
-//                Ok (pos1, ())
-//            else
-//                Ok (pos, ())
-//        with
-//        | _ -> Err "removeContrlPrefix"
-
-//let private parseStringInternal (str:string) 
-//                                (matchCase:bool) : TablesExtractor<string> = 
-//    TablesExtractor <| fun doc pos -> 
-//        match apply1 (findText str matchCase) doc pos with
-//        | Err _ -> Err "parseStringInternal"
-//        | Ok (_,region) -> 
-//            if region.RegionStart = pos then 
-//                let text = regionText region doc
-//                Ok (region.RegionEnd, text)
-//            else
-//                Err "parseStringInternal"
-
-//let pstring (str:string) : TablesExtractor<string> = 
-//    removeControlPrefix >>>. parseStringInternal str true <&?> "pstring"
-
-//let pstringCI (str:string) : TablesExtractor<string> = 
-//    removeControlPrefix >>>. parseStringInternal str false <&?> "pstringCI"
-
-//let pchar (ch:char) : TablesExtractor<char> = 
-//    tablesExtract { 
-//        let! s1 = pstring (ch.ToString()) 
-//        if s1.Length = 1 then 
-//            return s1.[0]
-//        else
-//            throwError "pchar" |> ignore
-//    } <&?> "pchar"
-
-
-///// This ignores control characters.
-//let anyChar : TablesExtractor<char> = 
-//    TablesExtractor <| fun doc pos -> 
-//        try 
-//            let range = doc.Range(Start=rbox pos)
-//            let regMatch = Regex.Match(range.Text, @"\A[\p{C}]+")
-//            if regMatch.Success then 
-//                let pos1 = pos + regMatch.Length
-//                let range1 = doc.Range(Start = rbox pos1)
-//                let ch1 = cleanRangeText(range1).[0]
-//                Ok (pos1+1, ch1)
-//            else
-//                let range1 = doc.Range(Start=rbox pos)
-//                let ch1 = cleanRangeText(range1).[0]
-//                Ok (pos+1, ch1)
-//        with
-//        | _ -> Err "anyChar"
-
+//        Ok (ix,finds)

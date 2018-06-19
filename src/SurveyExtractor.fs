@@ -6,10 +6,11 @@ module SurveyExtractor
 
 open DocSoup.Base
 open DocSoup.TableExtractor1
-open DocSoup.DocExtractor
+open DocSoup.TablesExtractor
 open DocSoup
 
 open SurveySyntax
+open System.Security.Policy
 
 
 // Note - layout changes are expected for the input documents we are querying here.
@@ -20,8 +21,8 @@ open SurveySyntax
 // *************************************
 // Helpers
 
-let sw (msg:string) (ma:DocExtractor<'a>) : DocExtractor<'a> =
-    docExtract { 
+let sw (msg:string) (ma:TablesExtractor<'a>) : TablesExtractor<'a> =
+    parseTables { 
         let stopWatch = System.Diagnostics.Stopwatch.StartNew()
         do printfn "%s" msg
         let! ans = ma
@@ -57,13 +58,19 @@ let getFieldValuePattern (search:string) : TableExtractor1<string> =
     good <|||> t1return ""
 
 
-let section (number:int) 
-                (ma:DocExtractor<'a>) : DocExtractor<'a> = 
-    let startMarker = sprintf "Section %i" number
-    advanceM (findTextEnd startMarker true) >>>. ma
-
 let assertHeaderCell (str:string) : TableExtractor1<unit> = 
     withCellM (getCellByIndex 1 1) <| assertCellText str
+
+    
+let assertHeaderCellPattern (pattern:string) : TableExtractor1<unit> = 
+    withCellM (getCellByIndex 1 1) <| assertCellMatches pattern
+
+let ignoreTable (tableHeader:string) : TablesExtractor<unit> = 
+    parseTable (assertHeaderCell tableHeader)
+
+let tableNot (tableHeader:string) : TablesExtractor<unit> = 
+    parseTable (assertCellTextNot tableHeader)
+
 
 // *************************************
 // Survey parsers
@@ -170,18 +177,18 @@ let extractUltrasonicSensorInfo : TableExtractor1<UltrasonicSensorInfo> =
             GridRef = "" }
     }
 
-let extractUltrasonicInfo1 : DocExtractor<UltrasonicInfo> = 
-    docExtract { 
-        let! monitor = nextTable extractUltrasonicMonitorInfo
-        let! sensor  = nextTable extractUltrasonicSensorInfo
+let extractUltrasonicInfo1 : TablesExtractor<UltrasonicInfo> = 
+    parseTables { 
+        let! monitor = parseTable extractUltrasonicMonitorInfo
+        let! sensor  = parseTable extractUltrasonicSensorInfo
         return { 
             MonitorInfo = monitor
             SensorInfo = sensor } 
     }
 
 /// To ignore
-let tableUltrasonicPhotos : DocExtractor<unit> = 
-    nextTable (assertHeaderCell "Ultrasonic Photos" )
+let tableUltrasonicPhotos : TableExtractor1<unit> = 
+    assertHeaderCell "Ultrasonic Photos" 
 
 let extractOverflowType : TableExtractor1<OverflowType> =  
     table1 { 
@@ -253,38 +260,40 @@ let tableOutfallPhoto : TableExtractor1<unit> =
         return ()
     }
 
-let scopeOfWorksTable : TableExtractor1<string> = 
+let extractScopeOfWorks : TableExtractor1<string> = 
     table1 {
         do! assertHeaderCell "Scope of Works"
         let! ans = withCellM (getCellByIndex 3 1) <| getCellText
         return ans
     }
 
+/// Single table - Title (1,1) = "Appendix", data in cell (r2,c1):
+let extractAppendix : TableExtractor1<string> =  
+    assertHeaderCellPattern "Appendix" &>>>. 
+        (withCellM (getCellByIndex 2 1) <| getCellText)
 
-/// General site / survey info     
-let sectionSite : DocExtractor<SiteInfo * SurveyInfo> = 
-    section 1
-        <| docExtract { 
-                let! site           = nextTable extractSiteDetails
-                let! surveyInfo     = nextTable extractSurveyInfo
-                // Doc now has photo tables - don't extract    
-                return (site, surveyInfo)
-            } 
+///// General site / survey info     
+//let sectionSite : DocExtractor<SiteInfo * SurveyInfo> = 
+//    section 1
+//        <| docExtract { 
+//                let! site           = nextTable extractSiteDetails
+//                let! surveyInfo     = nextTable extractSurveyInfo
+//                // Doc now has photo tables - don't extract    
+//                return (site, surveyInfo)
+//            } 
 
-let sectionOutstation : DocExtractor<OutstationInfo> = 
-    section 2 <| nextTable extractOutstationInfo
+//let sectionOutstation : DocExtractor<OutstationInfo> = 
+//    section 2 <| nextTable extractOutstationInfo
 
 
-let ultrasonicTable : DocExtractor<UltrasonicInfo option> = 
+let ultrasonicTable : TablesExtractor<UltrasonicInfo option> = 
     let info = extractUltrasonicInfo1 |>>> Some
-    let photos = tableUltrasonicPhotos |>>> (fun () -> None)
+    let photos = parseTable tableUltrasonicPhotos |>>> (fun () -> None)
     photos <||> info
 
 
-let sectionUltrasonics : DocExtractor<UltrasonicInfo list>= 
-    let stop = lookahead (whiteSpace >>>. pstring "Section 4")
-    section 3 <| 
-        (manyTill1 ultrasonicTable stop) |>>> (List.choose id)
+let sectionUltrasonics : TablesExtractor<UltrasonicInfo list>= 
+    many ultrasonicTable |>>> (List.choose id)
     
 
 /// list<Overflow Chamber> * list<Chamber Measurements>
@@ -297,11 +306,11 @@ type ChamberTable =
 
 
 
-let chamberTable : DocExtractor<ChamberTable> = 
+let chamberTable : TableExtractor1<ChamberTable> = 
     let info    = extractOverflowChamberInfo &|>>> InfoTable
     let metrics = extractOverflowChamberMetrics &|>>> MetricsTable 
     let photo   = tableOverflowPhoto &|>>> PhotoTable
-    nextTable (metrics <|||> info <|||> photo) 
+    (metrics <|||> info <|||> photo) 
 
 let private getOverflowLists (source: ChamberTable list) 
                                 : OverflowChamberInfo list * OverflowChamberMetrics list = 
@@ -313,51 +322,48 @@ let private getOverflowLists (source: ChamberTable list)
         | PhotoTable _ :: rest -> work ac bc rest
     work [] [] source
             
-let sectionChambers : DocExtractor<OverflowChamberInfo list * OverflowChamberMetrics list>= 
-    let stop = lookahead (whiteSpace >>>. pstring "Section 5")
-    section 4 <| 
-        (manyTill1 chamberTable stop |>>> getOverflowLists)
+let sectionChambers : TablesExtractor<OverflowChamberInfo list * OverflowChamberMetrics list>= 
+    many (parseTable chamberTable) |>>> getOverflowLists
 
 
-let outfallTable : DocExtractor<OutfallInfo option> = 
+let outfallTable : TableExtractor1<OutfallInfo option> = 
     let info = extractOutfallInfo &|>>> Some
     let photo = tableOutfallPhoto &|>>> (fun () -> None)
-    nextTable (photo <|||> info) <&?> "outfallTable"
+    swapTableError "outfallTable" (photo <|||> info)
 
 
 /// Note table parser would find finds "OutFall Photos" if we just looked for 
 /// "Outfall".
-let sectionOutfalls : DocExtractor<OutfallInfo list>= 
-    let stop = lookahead (whiteSpace >>>. pstring "Section 6")
-    section 5 <| 
-        (manyTill outfallTable stop |>>> (List.choose id))
+let sectionOutfalls : TablesExtractor<OutfallInfo list>= 
+    many (parseTable outfallTable) |>>> (List.choose id)
         
 
 
 
-/// Single table - Title (1,1) = "Scope of Works", data in cell (r3,c1):
-let scopeOfWorks : DocExtractor<string> = 
-    section 6 <| nextTable scopeOfWorksTable
 
 
-/// Single table - Title (1,1) = "Appendix", data in cell (r2,c1):
-let appendix : DocExtractor<string> =  
-    section 7 
-        <| nextTable (withCellM (getCellByIndex 2 1) <| getCellText)
+let parseSurvey : TablesExtractor<Survey> = 
+    parseTables { 
+        let! site           = 
+            sw "site"           <| parseTable extractSiteDetails      
 
+        let! surveyInfo     = 
+            sw "survey info"    <| parseTable extractSurveyInfo
 
-let parseSurvey : DocExtractor<Survey> = 
-    docExtract { 
-        let! (site, surveyInfo)     = 
-            sw "survey-info"      sectionSite      
+        do! skipMany (tableNot "RTU Outstation")
+        let! outstation     = 
+            sw "outstation"     <| parseTable  extractOutstationInfo
 
-        let! outstation     = sw "outstation"        sectionOutstation
+        do! skipMany (tableNot "Ultrasonic Level Control")
         let! ultrasonics    = sw "ultrasonics"      sectionUltrasonics
+
         let! (chambers, metrics)    = 
             sw "chambers"         sectionChambers
         let! outfalls       = sw "outfalls"         sectionOutfalls
-        let! scopeText      = sw "scope-of-works"   scopeOfWorks
-        let! appendixText   = sw "appendix"         appendix
+        let! scopeText      = 
+            sw "scope-of-works"  <| parseTable   extractScopeOfWorks
+        let! appendixText   = 
+            sw "appendix"        <| parseTable  extractAppendix
         return { 
             SiteDetails = site
             SurveyInfo = surveyInfo

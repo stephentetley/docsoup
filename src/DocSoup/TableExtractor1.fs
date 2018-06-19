@@ -138,6 +138,28 @@ let optional (ma:TableExtractor1<'a>) : TableExtractor1<'a option> =
         | T1Err _ -> T1Ok None
         | T1Ok a -> T1Ok (Some a)
 
+/// Perform two actions in sequence. Ignore the results of the second action if both succeed.
+let seqL (ma:TableExtractor1<'a>) (mb:TableExtractor1<'b>) : TableExtractor1<'a> = 
+    table1 { 
+        let! a = ma
+        let! b = mb
+        return a
+    }
+
+/// Perform two actions in sequence. Ignore the results of the first action if both succeed.
+let seqR (ma:TableExtractor1<'a>) (mb:TableExtractor1<'b>) : TableExtractor1<'b> = 
+    table1 { 
+        let! a = ma
+        let! b = mb
+        return b
+    }
+
+let (.&>>>) (ma:TableExtractor1<'a>) (mb:TableExtractor1<'b>) : TableExtractor1<'a> = 
+    seqL ma mb
+
+let (&>>>.) (ma:TableExtractor1<'a>) (mb:TableExtractor1<'b>) : TableExtractor1<'b> = 
+    seqR ma mb
+
 
 // *************************************
 // Run function
@@ -186,6 +208,24 @@ let getCellText : TableExtractor1<string> =
         with
         | _ -> T1Err "getCellText"
 
+// *************************************
+// Metric info
+
+let getTableRegion : TableExtractor1<Region> = 
+    TableExtractor1 <| fun table pos ->
+        try 
+            T1Ok <| extractRegion table.Range
+        with
+        | _ -> T1Err "getTableRegion"
+
+
+let getCellRegion : TableExtractor1<Region> = 
+    TableExtractor1 <| fun table pos ->
+        try 
+            let cell = table.Cell(pos.RowIx, pos.ColumnIx)
+            T1Ok <| extractRegion cell.Range
+        with
+        | _ -> T1Err "getCellRegion"
 
 // *************************************
 // Assert
@@ -217,6 +257,12 @@ let assertCellEmpty : TableExtractor1<unit> =
         let msg = sprintf "assertCellEmpty failed - found '%s'" cellText
         tableError msg
     assertCellTest (fun str -> str.Length = 0) errCont
+
+let assertCellTextNot (str:string) : TableExtractor1<unit> = 
+    let errCont (cellText:string) = 
+        let msg = sprintf "assertCellText failed - found '%s'; expecting '%s'" cellText str
+        tableError msg
+    assertCellTest (fun s -> not <| str.Equals(s)) errCont
 
 // *************************************
 // String level parsing with FParsec
