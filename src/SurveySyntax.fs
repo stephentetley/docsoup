@@ -90,9 +90,20 @@ type UltrasonicInfo =
         v.MonitorInfo.isEmpty 
             && v.SensorInfo.isEmpty
 
+type OverflowChamberInfo = 
+    { DischargeName: string
+      ChamberName: string
+      OverflowGridRef: string
+      IsScreened: string } 
+    member v.isEmpty  = 
+        v.ChamberName = ""
+            && v.OverflowGridRef = ""
+            && v.IsScreened = ""
+
+
 type OverflowType = SCREENED | UNSCREENED
 
-type ChamberInfo = 
+type OverflowChamberMetrics = 
     { OverflowType: OverflowType
       ChamberName: string 
       RoofToInvert: string
@@ -122,7 +133,8 @@ type Survey =
       SurveyInfo: SurveyInfo
       OutstationInfo: OutstationInfo
       UltrasonicInfos: UltrasonicInfo list
-      ChamberInfos: ChamberInfo list 
+      ChamberInfos: OverflowChamberInfo list
+      ChamberMetrics: OverflowChamberMetrics list
       OutfallInfos: OutfallInfo list
       ScopeOfWorks: string 
       AppendixText: string }

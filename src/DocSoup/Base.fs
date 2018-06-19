@@ -16,7 +16,8 @@ let rbox (v : 'a) : obj ref = ref (box v)
 
 
 let cleanRangeText (range:Word.Range) : string = 
-    let ans = Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "") in ans.Trim() 
+    let str = Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
+    str.Trim() 
 
 // StringReader appears to be the best way of doing this. 
 // Trying to split on a character (or character combo e.g. "\r\n") seems unreliable.

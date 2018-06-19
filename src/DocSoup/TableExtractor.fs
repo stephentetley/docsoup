@@ -3,10 +3,12 @@
 
 module DocSoup.TableExtractor
 
+open System.Text.RegularExpressions
 open Microsoft.Office.Interop
 open FParsec
 
 open DocSoup.Base
+open System
 
 
 type TResult<'a> = 
@@ -109,11 +111,11 @@ let mapM (p: 'a -> TableExtractor<'b>) (source:'a list) : TableExtractor<'b list
         work [] source
 
 /// Operator for fmap.
-let (||>>>) (ma:TableExtractor<'a>) (fn:'a -> 'b) : TableExtractor<'b> = 
+let (&|>>>) (ma:TableExtractor<'a>) (fn:'a -> 'b) : TableExtractor<'b> = 
     fmapM fn ma
 
 /// Flipped fmap.
-let (<<<||) (fn:'a -> 'b) (ma:TableExtractor<'a>) : TableExtractor<'b> = 
+let (<<<|&) (fn:'a -> 'b) (ma:TableExtractor<'a>) : TableExtractor<'b> = 
     fmapM fn ma
 
 
@@ -182,6 +184,36 @@ let getCellText : TableExtractor<string> =
         | _ -> TErr "getCellText"
 
 
+// *************************************
+// Assert
+
+let internal assertCellTest 
+                (test:string -> bool) 
+                (failCont:string ->TableExtractor<_>) : TableExtractor<unit> = 
+    getCellText &>>= fun str ->
+    if test str then 
+        treturn ()
+    else
+        failCont str
+
+let assertCellText (str:string) : TableExtractor<unit> = 
+    let errCont (cellText:string) = 
+        let msg = sprintf "assertCellText failed - found '%s'; expecting '%s'" cellText str
+        tableError msg
+    assertCellTest (fun s -> str.Equals(s)) errCont
+
+let assertCellMatches (pattern:string) : TableExtractor<unit> = 
+    let matchProc (str:string) = Regex.Match(str, pattern).Success
+    let errCont (cellText:string) = 
+        let msg = sprintf "assertCellMatches failed - found '%s'; expecting match on '%s'" cellText pattern
+        tableError msg
+    assertCellTest matchProc errCont
+
+let assertCellEmpty : TableExtractor<unit> = 
+    let errCont (cellText:string) = 
+        let msg = sprintf "assertCellEmpty failed - found '%s'" cellText
+        tableError msg
+    assertCellTest (fun str -> str.Length = 0) errCont
 
 // *************************************
 // String level parsing with FParsec

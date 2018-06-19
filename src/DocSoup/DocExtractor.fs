@@ -78,6 +78,25 @@ type DocExtractorBuilder() =
 
 let (docExtract:DocExtractorBuilder) = new DocExtractorBuilder()
 
+// *************************************
+// Errors
+
+let throwError (msg:string) : DocExtractor<'a> = 
+    DocExtractor <| fun _ _ -> Err msg
+
+let swapError (msg:string) (ma:DocExtractor<'a>) : DocExtractor<'a> = 
+    DocExtractor <| fun doc pos ->
+        match apply1 ma doc pos with
+        | Err _ -> Err msg
+        | Ok (pos1,a) -> Ok (pos1,a)
+
+let (<&?>) (ma:DocExtractor<'a>) (msg:string) : DocExtractor<'a> = 
+    swapError msg ma
+
+let (<?&>) (msg:string) (ma:DocExtractor<'a>) : DocExtractor<'a> = 
+    swapError msg ma
+
+
 
 /// Bind operator (name avoids clash with FParsec).
 let (>>>=) (ma:DocExtractor<'a>) 
@@ -218,7 +237,8 @@ let alt (ma:DocExtractor<'a>) (mb:DocExtractor<'a>) : DocExtractor<'a> =
         | Err _ -> apply1 mb doc pos
         | Ok (pos1,a) -> Ok (pos1,a)
 
-let (<||>) (ma:DocExtractor<'a>) (mb:DocExtractor<'a>) : DocExtractor<'a> = alt ma mb
+let (<||>) (ma:DocExtractor<'a>) (mb:DocExtractor<'a>) : DocExtractor<'a> = 
+    alt ma mb <&?> "(<||>)"
 
 
 // Haskell Applicative's (<*>)
@@ -311,6 +331,9 @@ let optionToFailure (ma:DocExtractor<option<'a>>)
         | Err msg -> Err msg
         | Ok (_,None) -> Err errMsg
         | Ok (pos1, Some a) -> Ok (pos1,a)
+
+
+
 
 
 /// Optionally parses. When the parser fails return None and don't move the cursor position.
@@ -483,6 +506,9 @@ let askNextTable : DocExtractor<TableAnchor> =
         with
         | _ -> Err "askNextTable" 
 
+/// This is the wrong abstraction / traversal strategy
+/// We should be using the index into the array of tables in a document.
+
 
 /// Note - this is unguarded, use with care in many, many1 etc. 
 let nextTable (ma:TableExtractor<'a>) : DocExtractor<'a> = 
@@ -520,23 +546,6 @@ let nextTable (ma:TableExtractor<'a>) : DocExtractor<'a> =
 //            | Failure(msg,_,_) -> Ok <| FallbackText text
 
 
-// *************************************
-// Errors
-
-let throwError (msg:string) : DocExtractor<'a> = 
-    DocExtractor <| fun _ _ -> Err msg
-
-let swapError (msg:string) (ma:DocExtractor<'a>) : DocExtractor<'a> = 
-    DocExtractor <| fun doc pos ->
-        match apply1 ma doc pos with
-        | Err _ -> Err msg
-        | Ok (pos1,a) -> Ok (pos1,a)
-
-let (<&?>) (ma:DocExtractor<'a>) (msg:string) : DocExtractor<'a> = 
-    swapError msg ma
-
-let (<?&>) (msg:string) (ma:DocExtractor<'a>) : DocExtractor<'a> = 
-    swapError msg ma
 
 
 // *************************************

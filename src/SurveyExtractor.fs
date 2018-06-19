@@ -62,12 +62,15 @@ let section (number:int)
     let startMarker = sprintf "Section %i" number
     advanceM (findTextEnd startMarker true) >>>. ma
 
+let assertHeaderCell (str:string) : TableExtractor<unit> = 
+    withCellM (getCellByIndex 1 1) <| assertCellText str
 
 // *************************************
 // Survey parsers
 
 let extractSiteDetails : TableExtractor<SiteInfo> = 
     tableExtract { 
+        do! assertHeaderCell "Site Details"
         let! sname          = getFieldValue "Site Name" false
         let! uid            = getFieldValue "SAI Number" false
         let! discharge      = getFieldValue "Discharge Name" false
@@ -83,6 +86,7 @@ let extractSiteDetails : TableExtractor<SiteInfo> =
 
 let extractSurveyInfo : TableExtractor<SurveyInfo> = 
     tableExtract { 
+        do! assertHeaderCell "Survey Information"
         let! name       = getFieldValue "Engineer Name" false
         let! sdate      = getFieldValue "Date of Survey" false
         return { 
@@ -94,6 +98,7 @@ let extractSurveyInfo : TableExtractor<SurveyInfo> =
 
 let extractOutstationInfo : TableExtractor<OutstationInfo> = 
     tableExtract { 
+        do! assertHeaderCell "RTU Outstation"
         let! name       = getFieldValue "Outstation Name" false
         let! rtuAddr    = getFieldValue "RTU Address" false
         let! otype      = getFieldValue "Outstation Type" false
@@ -125,10 +130,11 @@ let extractRelay (relayNumber:int) : TableExtractor<RelaySetting> =
 
 
 let extractRelays : TableExtractor<RelaySetting list> = 
-    DocSoup.TableExtractor.mapM extractRelay [1..6] ||>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
+    DocSoup.TableExtractor.mapM extractRelay [1..6] &|>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
-let extractUltrasonicMonitorInfo1 : TableExtractor<UltrasonicMonitorInfo> = 
+let extractUltrasonicMonitorInfo : TableExtractor<UltrasonicMonitorInfo> = 
     tableExtract {
+        do! assertHeaderCell "Ultrasonic Level Control"
         let! disName    = getFieldValue "Discharge Being Monitored" false
         let! procName   = getFieldValue "Process or Facility" false
         let! manuf      = getFieldValue "Manufacturer" false
@@ -150,8 +156,9 @@ let extractUltrasonicMonitorInfo1 : TableExtractor<UltrasonicMonitorInfo> =
             Relays = relays }
     } 
 
-let extractUltrasonicSensorInfo1 : TableExtractor<UltrasonicSensorInfo> = 
+let extractUltrasonicSensorInfo : TableExtractor<UltrasonicSensorInfo> = 
     tableExtract {
+        do! assertHeaderCell "Ultrasonic Sensor Head"
         let! manuf      = getFieldValue "Manufacturer" false
         let! model      = getFieldValue "Model" false
         let! snumber    = getFieldValue "Serial Number" false
@@ -165,14 +172,16 @@ let extractUltrasonicSensorInfo1 : TableExtractor<UltrasonicSensorInfo> =
 
 let extractUltrasonicInfo1 : DocExtractor<UltrasonicInfo> = 
     docExtract { 
-        let! monitor = nextTable extractUltrasonicMonitorInfo1
-        let! sensor  = nextTable extractUltrasonicSensorInfo1
+        let! monitor = nextTable extractUltrasonicMonitorInfo
+        let! sensor  = nextTable extractUltrasonicSensorInfo
         return { 
             MonitorInfo = monitor
             SensorInfo = sensor } 
     }
 
-
+/// To ignore
+let tableUltrasonicPhotos : DocExtractor<unit> = 
+    nextTable (assertHeaderCell "Ultrasonic Photos" )
 
 let extractOverflowType : TableExtractor<OverflowType> =  
     tableExtract { 
@@ -184,8 +193,23 @@ let extractOverflowType : TableExtractor<OverflowType> =
     }
 
 
-let extractChamberInfo1 : TableExtractor<ChamberInfo> =  
+let extractOverflowChamberInfo : TableExtractor<OverflowChamberInfo> =  
     tableExtract { 
+        do! assertHeaderCell "Overflow Chamber" 
+        let! disName        = getFieldValue "Discharge Name" false
+        let! chamberName    = getFieldValuePattern "Name of Chamber"
+        let! gridRef        = getFieldValue "Grid Ref" false
+        let! screened       = getFieldValuePattern "Overflow Screened"
+        return { 
+            DischargeName = disName
+            ChamberName = chamberName
+            OverflowGridRef = gridRef
+            IsScreened = screened }
+    }
+
+let extractOverflowChamberMetrics : TableExtractor<OverflowChamberMetrics> =  
+    tableExtract { 
+        do! assertHeaderCell "Chamber Measurements"
         let! otype      = extractOverflowType
         let! name       = getFieldValue "Chamber Name" false
         let! roofDist   = getFieldValue "Roof Slab to Invert" false
@@ -204,10 +228,14 @@ let extractChamberInfo1 : TableExtractor<ChamberInfo> =
         }
     }
 
+/// To ignore
+let tableOverflowPhoto : TableExtractor<unit> = 
+    assertHeaderCell "Overflow Chamber Photo"
+    
 
-
-let extractOutfallInfo1 : TableExtractor<OutfallInfo> = 
+let extractOutfallInfo : TableExtractor<OutfallInfo> = 
     tableExtract { 
+        do! assertHeaderCell "Outfall"
         let! dname      = getFieldValue "Discharge Name" false
         let! gridRef    = getFieldValue "Grid Ref" false
         let! proven     = getFieldValue "Outfall Proven" false
@@ -218,10 +246,19 @@ let extractOutfallInfo1 : TableExtractor<OutfallInfo> =
         }
     }
 
+/// To ignore
+let tableOutfallPhoto : TableExtractor<unit> = 
+    tableExtract {
+        do! assertHeaderCell "Outfall Photo"
+        return ()
+    }
 
-
-
-
+let scopeOfWorksTable : TableExtractor<string> = 
+    tableExtract {
+        do! assertHeaderCell "Scope of Works"
+        let! ans = withCellM (getCellByIndex 3 1) <| getCellText
+        return ans
+    }
 
 
 /// General site / survey info     
@@ -238,30 +275,69 @@ let sectionOutstation : DocExtractor<OutstationInfo> =
     section 2 <| nextTable extractOutstationInfo
 
 
+let ultrasonicTable : DocExtractor<UltrasonicInfo option> = 
+    let info = extractUltrasonicInfo1 |>>> Some
+    let photos = tableUltrasonicPhotos |>>> (fun () -> None)
+    photos <||> info
+
+
 let sectionUltrasonics : DocExtractor<UltrasonicInfo list>= 
     let stop = lookahead (whiteSpace >>>. pstring "Section 4")
-    section 3 <| manyTill1 extractUltrasonicInfo1 stop
+    section 3 <| 
+        (manyTill1 ultrasonicTable stop) |>>> (List.choose id)
     
 
-let sectionChambers : DocExtractor<ChamberInfo list>= 
-    let stop = lookahead (whiteSpace >>>. pstring "Section 5")
-    section 4 <| manyTill1 (nextTable extractChamberInfo1) stop
+/// list<Overflow Chamber> * list<Chamber Measurements>
+/// ignore <Overflow Chamber Photo>
 
+type ChamberTable = 
+    | InfoTable of OverflowChamberInfo
+    | MetricsTable of OverflowChamberMetrics
+    | PhotoTable of unit
+
+
+
+let chamberTable : DocExtractor<ChamberTable> = 
+    let info    = extractOverflowChamberInfo &|>>> InfoTable
+    let metrics = extractOverflowChamberMetrics &|>>> MetricsTable 
+    let photo   = tableOverflowPhoto &|>>> PhotoTable
+    nextTable (metrics <|||> info <|||> photo) 
+
+let private getOverflowLists (source: ChamberTable list) 
+                                : OverflowChamberInfo list * OverflowChamberMetrics list = 
+    let rec work ac bc xs = 
+        match xs with
+        | [] -> (List.rev ac, List.rev bc)
+        | InfoTable a :: rest -> work (a::ac) bc rest
+        | MetricsTable b :: rest -> work ac (b::bc) rest
+        | PhotoTable _ :: rest -> work ac bc rest
+    work [] [] source
+            
+let sectionChambers : DocExtractor<OverflowChamberInfo list * OverflowChamberMetrics list>= 
+    let stop = lookahead (whiteSpace >>>. pstring "Section 5")
+    section 4 <| 
+        (manyTill1 chamberTable stop |>>> getOverflowLists)
+
+
+let outfallTable : DocExtractor<OutfallInfo option> = 
+    let info = extractOutfallInfo &|>>> Some
+    let photo = tableOutfallPhoto &|>>> (fun () -> None)
+    nextTable (photo <|||> info) <&?> "outfallTable"
 
 
 /// Note table parser would find finds "OutFall Photos" if we just looked for 
 /// "Outfall".
 let sectionOutfalls : DocExtractor<OutfallInfo list>= 
     let stop = lookahead (whiteSpace >>>. pstring "Section 6")
-    section 5 <| manyTill1 (nextTable extractOutfallInfo1) stop
+    section 5 <| 
+        (manyTill outfallTable stop |>>> (List.choose id))
         
 
 
 
 /// Single table - Title (1,1) = "Scope of Works", data in cell (r3,c1):
 let scopeOfWorks : DocExtractor<string> = 
-    section 6
-        <| nextTable (withCellM (getCellByIndex 3 1) <| getCellText)
+    section 6 <| nextTable scopeOfWorksTable
 
 
 /// Single table - Title (1,1) = "Appendix", data in cell (r2,c1):
@@ -272,12 +348,13 @@ let appendix : DocExtractor<string> =
 
 let parseSurvey : DocExtractor<Survey> = 
     docExtract { 
-        let! (site, surveyInfo) = 
+        let! (site, surveyInfo)     = 
             sw "survey-info"      sectionSite      
 
         let! outstation     = sw "outstation"        sectionOutstation
         let! ultrasonics    = sw "ultrasonics"      sectionUltrasonics
-        let! chambers       = sw "chambers"         sectionChambers
+        let! (chambers, metrics)    = 
+            sw "chambers"         sectionChambers
         let! outfalls       = sw "outfalls"         sectionOutfalls
         let! scopeText      = sw "scope-of-works"   scopeOfWorks
         let! appendixText   = sw "appendix"         appendix
@@ -286,6 +363,7 @@ let parseSurvey : DocExtractor<Survey> =
             SurveyInfo = surveyInfo
             OutstationInfo = outstation
             UltrasonicInfos = ultrasonics
+            ChamberMetrics = metrics
             ChamberInfos = chambers
             OutfallInfos = outfalls
             ScopeOfWorks = scopeText
