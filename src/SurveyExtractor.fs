@@ -137,20 +137,21 @@ let extractRelay (relayNumber:int) : Table1<RelaySetting> =
 
 
 let extractRelays : Table1<RelaySetting list> = 
-    DocSoup.TableExtractor1.mapM extractRelay [1..6] &|>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
+    DocSoup.TableExtractor1.mapM extractRelay [1..6] 
+        &|>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
 let extractUltrasonicMonitorInfo : Table1<UltrasonicMonitorInfo> = 
     table1 {
         do! assertHeaderCell "Ultrasonic Level Control"
         let! disName    = getFieldValue "Discharge Being Monitored" false
-        let! procName   = getFieldValue "Process or Facility" false
+        let! procName   = getFieldValueByRow 3
         let! manuf      = getFieldValue "Manufacturer" false
         let! model      = getFieldValue "Model" false
         let! snumber    = getFieldValue "Serial Number" false
         let! piTag      = getFieldValue "P & I Tag" false
         let! emptyDist  = getFieldValue "Empty Distance" false
         let! span       = getFieldValue "Span" false
-        let! relays     =  extractRelays
+        let! relays     = extractRelays
         return { 
             MonitoredDischarge = disName
             ProcessOrFacilityName = procName
@@ -161,7 +162,7 @@ let extractUltrasonicMonitorInfo : Table1<UltrasonicMonitorInfo> =
             EmptyDistance = emptyDist
             Span = span
             Relays = relays }
-    } 
+    }  <&??> "extractUltrasonicMonitorInfo"
 
 let extractUltrasonicSensorInfo : Table1<UltrasonicSensorInfo> = 
     table1 {
@@ -169,17 +170,19 @@ let extractUltrasonicSensorInfo : Table1<UltrasonicSensorInfo> =
         let! manuf      = getFieldValue "Manufacturer" false
         let! model      = getFieldValue "Model" false
         let! snumber    = getFieldValue "Serial Number" false
+        let! location   = getFieldValuePattern "Location of Sensor"
+        let! gridRef    = getFieldValuePattern "Grid Ref"
         return { 
             SensorManufacturer = manuf
             SensorModel = model
             SerialNumber = snumber 
-            LocationOfSensor = ""
-            GridRef = "" }
-    }
+            LocationOfSensor = location
+            GridRef = gridRef }
+    } <&??> "extractUltrasonicSensorInfo"
 
 let extractUltrasonicInfo1 : TablesExtractor<UltrasonicInfo> = 
     parseTables { 
-        let! monitor = parseTable extractUltrasonicMonitorInfo
+        let! monitor = parseTable extractUltrasonicMonitorInfo <&?> "ultrasonic failed"
         let! sensor  = parseTable extractUltrasonicSensorInfo
         return { 
             MonitorInfo = monitor
@@ -272,28 +275,15 @@ let extractAppendix : Table1<string> =
     assertHeaderCellPattern "Appendix" &>>>. 
         (withCellM (getCellByIndex 2 1) <| getCellText)
 
-///// General site / survey info     
-//let sectionSite : DocExtractor<SiteInfo * SurveyInfo> = 
-//    section 1
-//        <| docExtract { 
-//                let! site           = nextTable extractSiteDetails
-//                let! surveyInfo     = nextTable extractSurveyInfo
-//                // Doc now has photo tables - don't extract    
-//                return (site, surveyInfo)
-//            } 
-
-//let sectionOutstation : DocExtractor<OutstationInfo> = 
-//    section 2 <| nextTable extractOutstationInfo
-
 
 let ultrasonicTable : TablesExtractor<UltrasonicInfo option> = 
     let info = extractUltrasonicInfo1 |>>> Some
     let photos = parseTable tableUltrasonicPhotos |>>> (fun () -> None)
-    photos <||> info
+    (photos <||> info) <&?> "ultrasonicTable"
 
 
 let sectionUltrasonics : TablesExtractor<UltrasonicInfo list>= 
-    many ultrasonicTable |>>> (List.choose id)
+    many1 ultrasonicTable |>>> (List.choose id)
     
 
 /// list<Overflow Chamber> * list<Chamber Measurements>
@@ -323,7 +313,7 @@ let private getOverflowLists (source: ChamberTable list)
     work [] [] source
             
 let sectionChambers : TablesExtractor<OverflowChamberInfo list * OverflowChamberMetrics list>= 
-    many (parseTable chamberTable) |>>> getOverflowLists
+    many1 (parseTable chamberTable) |>>> getOverflowLists
 
 
 let outfallTable : Table1<OutfallInfo option> = 
@@ -335,7 +325,7 @@ let outfallTable : Table1<OutfallInfo option> =
 /// Note table parser would find finds "OutFall Photos" if we just looked for 
 /// "Outfall".
 let sectionOutfalls : TablesExtractor<OutfallInfo list>= 
-    many (parseTable outfallTable) |>>> (List.choose id)
+    many1 (parseTable outfallTable) |>>> (List.choose id)
         
 
 

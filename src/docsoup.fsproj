@@ -58,6 +58,7 @@
     <Compile Include="DocSoup\DocExtractor.fs" />
     <Compile Include="SurveySyntax.fs" />
     <Compile Include="SurveyExtractor.fs" />
+    <None Include="SurveySensorReport.fsx" />
     <None Include="TestSurvey01.fsx" />
     <None Include="Temp01.fsx" />
     <None Include="Temp02.fsx" />

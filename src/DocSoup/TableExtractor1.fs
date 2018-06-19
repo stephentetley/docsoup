@@ -185,6 +185,13 @@ let swapTableError (msg:string) (ma:Table1<'a>) : Table1<'a> =
         | T1Err _ -> T1Err msg
         | T1Ok a -> T1Ok a
 
+
+let (<&??>) (ma:Table1<'a>) (msg:string) : Table1<'a> = 
+    swapTableError msg ma
+
+let (<??&>) (msg:string) (ma:Table1<'a>) : Table1<'a> = 
+    swapTableError msg ma
+
 let assertCellInBounds (cell:CellIndex) : Table1<unit> = 
     Table1 <| fun table pos ->
         if (cell.RowIx >= 1 && cell.RowIx <= table.Rows.Count) &&
