@@ -9,15 +9,17 @@ open Microsoft.Office.Interop
 #r "FParsec"
 #r "FParsecCS"
 
+open System
+
 #load @"DocSoup\Base.fs"
 #load @"DocSoup\TableExtractor1.fs"
 #load @"DocSoup\TablesExtractor.fs"
 #load @"SurveySyntax.fs"
 #load @"SurveyExtractor.fs"
-open DocSoup.TableExtractor1
 open DocSoup.TablesExtractor
 open SurveySyntax
 open SurveyExtractor
+
 
 type SensorRecord = 
     { SiteName: string
@@ -27,6 +29,43 @@ type SensorRecord =
       UsModel: string
       SensorHeadLocation: string
       SensorHeadGridRef: string }
+
+let headings : string list = 
+    [ "Site Name"
+    ; "Sai Number"
+    ; "Discharge Name"
+    ; "US Manufacturer"
+    ; "US Model"
+    ; "Sensor Head Location"
+    ; "Sensor Head Grid Ref" ]
+
+let titles : string = String.concat "," headings
+
+
+
+let optQuote(s:string) : string = 
+    if String.length s > 0 && s.[0] <> '"' then 
+        if s.Contains "," then
+            sprintf "\"%s\"" s
+        else
+            s
+    else
+        s
+
+
+let csvRow (sensor1:SensorRecord) : string = 
+    let cols = 
+        [ sensor1.SiteName
+        ; sensor1.SaiNumber
+        ; sensor1.DischargeName
+        ; sensor1.UsManufacturer
+        ; sensor1.UsManufacturer
+        ; optQuote (sensor1.SensorHeadLocation)
+        ; sensor1.SensorHeadGridRef
+        ]
+    String.concat "," cols
+
+
 
 let extractSensorRecords (survey:Survey) : SensorRecord list = 
     let siteName = survey.SiteDetails.SiteName
@@ -42,27 +81,29 @@ let extractSensorRecords (survey:Survey) : SensorRecord list =
     List.map makeRecord survey.UltrasonicInfos
 
 
-let processSurvey (docPath:string) : unit = 
+let processSurvey (sw:IO.StreamWriter) (docPath:string) : unit = 
     printfn "Doc: %s" docPath
     try 
         runOnFileE parseSurvey docPath 
             |> extractSensorRecords
-            |> List.iter (printfn "%A")
+            |> List.iter (fun r -> sw.WriteLine(csvRow r))
     with
     | _ -> 
         printfn "Fail: %s" docPath
 
 
-let processSite(folderPath:string) : unit  =
-    printfn "Site: '%s'" folderPath
+/// All surveys in one folder
+let processSurveys (sw:IO.StreamWriter) (folderPath:string) : unit  =
     System.IO.DirectoryInfo(folderPath).GetFiles(searchPattern = "*Survey.docx")
-        |> Array.iter (fun (info:System.IO.FileInfo) -> processSurvey info.FullName)
+        |> Array.iter (fun (info:System.IO.FileInfo) -> 
+                        processSurvey sw info.FullName)
 
 let main () : unit = 
-    let root = @"G:\work\Projects\events2\surveys_returned"
-    System.IO.DirectoryInfo(root).GetDirectories ()
-        |> Array.iteri 
-            (fun (ix:int) (info:System.IO.DirectoryInfo) -> processSite info.FullName)
+    let root = @"G:\work\Projects\events2\data\surveys_to_read"
+    let outPath = @"G:\work\Projects\events2\report_sensor_locations.csv"
+    use sw = new IO.StreamWriter(outPath)
+    sw.WriteLine titles
+    processSurveys sw root
 
 
 
