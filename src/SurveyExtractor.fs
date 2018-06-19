@@ -69,7 +69,7 @@ let assertHeaderCell (str:string) : TableExtractor1<unit> =
 // Survey parsers
 
 let extractSiteDetails : TableExtractor1<SiteInfo> = 
-    tableExtract { 
+    table1 { 
         do! assertHeaderCell "Site Details"
         let! sname          = getFieldValue "Site Name" false
         let! uid            = getFieldValue "SAI Number" false
@@ -85,7 +85,7 @@ let extractSiteDetails : TableExtractor1<SiteInfo> =
 
 
 let extractSurveyInfo : TableExtractor1<SurveyInfo> = 
-    tableExtract { 
+    table1 { 
         do! assertHeaderCell "Survey Information"
         let! name       = getFieldValue "Engineer Name" false
         let! sdate      = getFieldValue "Date of Survey" false
@@ -97,7 +97,7 @@ let extractSurveyInfo : TableExtractor1<SurveyInfo> =
 
 
 let extractOutstationInfo : TableExtractor1<OutstationInfo> = 
-    tableExtract { 
+    table1 { 
         do! assertHeaderCell "RTU Outstation"
         let! name       = getFieldValue "Outstation Name" false
         let! rtuAddr    = getFieldValue "RTU Address" false
@@ -116,7 +116,7 @@ let extractRelay (relayNumber:int) : TableExtractor1<RelaySetting> =
     let funPattern  = sprintf "Relay*%i*Function" relayNumber
     let onPattern   = sprintf "Relay*%i*On" relayNumber
     let offPattern  = sprintf "Relay*%i*Off" relayNumber
-    tableExtract { 
+    table1 { 
         let! relayfunction  = getFieldValuePattern funPattern
         let! onSetPt        = getFieldValuePattern onPattern
         let! offSetPt       = getFieldValuePattern offPattern
@@ -133,7 +133,7 @@ let extractRelays : TableExtractor1<RelaySetting list> =
     DocSoup.TableExtractor1.mapM extractRelay [1..6] &|>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
 let extractUltrasonicMonitorInfo : TableExtractor1<UltrasonicMonitorInfo> = 
-    tableExtract {
+    table1 {
         do! assertHeaderCell "Ultrasonic Level Control"
         let! disName    = getFieldValue "Discharge Being Monitored" false
         let! procName   = getFieldValue "Process or Facility" false
@@ -157,7 +157,7 @@ let extractUltrasonicMonitorInfo : TableExtractor1<UltrasonicMonitorInfo> =
     } 
 
 let extractUltrasonicSensorInfo : TableExtractor1<UltrasonicSensorInfo> = 
-    tableExtract {
+    table1 {
         do! assertHeaderCell "Ultrasonic Sensor Head"
         let! manuf      = getFieldValue "Manufacturer" false
         let! model      = getFieldValue "Model" false
@@ -184,7 +184,7 @@ let tableUltrasonicPhotos : DocExtractor<unit> =
     nextTable (assertHeaderCell "Ultrasonic Photos" )
 
 let extractOverflowType : TableExtractor1<OverflowType> =  
-    tableExtract { 
+    table1 { 
         let! a = TableExtractor1.optional <| findCell "Screen to Invert" false
         let! b = TableExtractor1.optional <| findCell "Emergency overflow level" false
         match a,b with
@@ -194,7 +194,7 @@ let extractOverflowType : TableExtractor1<OverflowType> =
 
 
 let extractOverflowChamberInfo : TableExtractor1<OverflowChamberInfo> =  
-    tableExtract { 
+    table1 { 
         do! assertHeaderCell "Overflow Chamber" 
         let! disName        = getFieldValue "Discharge Name" false
         let! chamberName    = getFieldValuePattern "Name of Chamber"
@@ -208,7 +208,7 @@ let extractOverflowChamberInfo : TableExtractor1<OverflowChamberInfo> =
     }
 
 let extractOverflowChamberMetrics : TableExtractor1<OverflowChamberMetrics> =  
-    tableExtract { 
+    table1 { 
         do! assertHeaderCell "Chamber Measurements"
         let! otype      = extractOverflowType
         let! name       = getFieldValue "Chamber Name" false
@@ -234,7 +234,7 @@ let tableOverflowPhoto : TableExtractor1<unit> =
     
 
 let extractOutfallInfo : TableExtractor1<OutfallInfo> = 
-    tableExtract { 
+    table1 { 
         do! assertHeaderCell "Outfall"
         let! dname      = getFieldValue "Discharge Name" false
         let! gridRef    = getFieldValue "Grid Ref" false
@@ -248,13 +248,13 @@ let extractOutfallInfo : TableExtractor1<OutfallInfo> =
 
 /// To ignore
 let tableOutfallPhoto : TableExtractor1<unit> = 
-    tableExtract {
+    table1 {
         do! assertHeaderCell "Outfall Photo"
         return ()
     }
 
 let scopeOfWorksTable : TableExtractor1<string> = 
-    tableExtract {
+    table1 {
         do! assertHeaderCell "Scope of Works"
         let! ans = withCellM (getCellByIndex 3 1) <| getCellText
         return ans

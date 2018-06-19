@@ -78,7 +78,7 @@ type TableExtractor1Builder() =
 
 // Prefer "parse" to "parser" for the _Builder instance
 
-let (tableExtract:TableExtractor1Builder) = new TableExtractor1Builder()
+let (table1:TableExtractor1Builder) = new TableExtractor1Builder()
 
 
 
@@ -89,6 +89,7 @@ let (&>>=) (ma:TableExtractor1<'a>)
 
 // API issue
 // Can all fmapM like things be done the outer monad (i.e. DocExtractor)?
+// ...
 // Not really, it feels like they are essential. So we will have to rely 
 // on qualified names and "respellings" for the operators.
 
@@ -223,7 +224,7 @@ let assertCellEmpty : TableExtractor1<unit> =
 // We expect string level parsers might fail. 
 // Use this with caution or use execFParsecFallback.
 let cellParse (parser:ParsecParser<'a>) : TableExtractor1<'a> = 
-    tableExtract { 
+    table1 { 
         let! text = getCellText
         let name = "none" 
         match runParserOnString parser () name text with
@@ -234,7 +235,7 @@ let cellParse (parser:ParsecParser<'a>) : TableExtractor1<'a> =
 
 // Returns fallback text if FParsec fails.
 let cellParseFallback (parser:ParsecParser<'a>) : TableExtractor1<FParsecFallback<'a>> = 
-    tableExtract { 
+    table1 { 
         let! text = getCellText
         let name = "none" 
         match runParserOnString parser () name text with
@@ -325,7 +326,7 @@ let findCellsByPattern (search:string) : TableExtractor1<CellIndex list> =
 // Note - indexing is from 1.
 let getCellByIndex (row:int) (col:int) : TableExtractor1<CellIndex> = 
     swapTableError "getCellByIndex" <| 
-        tableExtract { 
+        table1 { 
             let cellIx = { RowIx = row; ColumnIx = col }
             let! _ = assertCellInBounds cellIx
             return cellIx
@@ -335,7 +336,7 @@ let getCellByIndex (row:int) (col:int) : TableExtractor1<CellIndex> =
 
 let cellLeft (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellLeft" <| 
-        tableExtract { 
+        table1 { 
             let c1 = cell.DecrCol
             let! _ = assertCellInBounds c1
             return c1
@@ -344,7 +345,7 @@ let cellLeft (cell:CellIndex) : TableExtractor1<CellIndex> =
 
 let cellRight (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellRight" <| 
-        tableExtract { 
+        table1 { 
             let c1 = cell.IncrCol
             let! _ = assertCellInBounds c1
             return c1
@@ -352,7 +353,7 @@ let cellRight (cell:CellIndex) : TableExtractor1<CellIndex> =
 
 let cellBelow (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellBelow" <| 
-        tableExtract { 
+        table1 { 
             let c1 = cell.IncrRow
             let! _ = assertCellInBounds c1
             return c1
@@ -360,7 +361,7 @@ let cellBelow (cell:CellIndex) : TableExtractor1<CellIndex> =
 
 let cellAbove (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellAbove" <| 
-        tableExtract { 
+        table1 { 
             let c1 = cell.DecrRow
             let! _ = assertCellInBounds c1
             return c1
