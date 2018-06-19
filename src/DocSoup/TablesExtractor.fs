@@ -444,11 +444,11 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 //// *************************************
 //// Run tableExtractor1
 
-let parseTable (ma:TableExtractor1<'a>) : TablesExtractor<'a> = 
+let parseTable (ma:Table1<'a>) : TablesExtractor<'a> = 
     TablesExtractor <| fun tables ix ->
         try 
             let table:Word.Table = tables.[ix]
-            match runTableExtractor1 ma table with
+            match runTable1 ma table with
             | T1Err msg -> Err msg
             | T1Ok a -> Ok (ix+1,a)
         with

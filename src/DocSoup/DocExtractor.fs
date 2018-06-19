@@ -472,11 +472,11 @@ let runOnFileE (ma:DocExtractor<'a>) (fileName:string) : 'a =
 // *************************************
 // Run tableExtractor
 
-let withTable (anchor:TableAnchor) (ma:TableExtractor1<'a>) : DocExtractor<'a> = 
+let withTable (anchor:TableAnchor) (ma:Table1<'a>) : DocExtractor<'a> = 
     DocExtractor <| fun doc _ ->
         try 
             let table:Word.Table = doc.Tables.Item(anchor.Index)
-            match runTableExtractor1 (ma:TableExtractor1<'a>) table with
+            match runTable1 ma table with
             | T1Err msg -> Err msg
             | T1Ok a -> 
                 let pos1 = table.Range.End + 1
@@ -485,7 +485,7 @@ let withTable (anchor:TableAnchor) (ma:TableExtractor1<'a>) : DocExtractor<'a> =
         | _ -> Err "withTable" 
 
         
-let withTableM (anchorQuery:DocExtractor<TableAnchor>) (ma:TableExtractor1<'a>) : DocExtractor<'a> = 
+let withTableM (anchorQuery:DocExtractor<TableAnchor>) (ma:Table1<'a>) : DocExtractor<'a> = 
     anchorQuery >>>= fun a -> withTable a ma 
 
 // Now we have a cursor we can have a nextTable function.
@@ -511,7 +511,7 @@ let askNextTable : DocExtractor<TableAnchor> =
 
 
 /// Note - this is unguarded, use with care in many, many1 etc. 
-let nextTable (ma:TableExtractor1<'a>) : DocExtractor<'a> = 
+let nextTable (ma:Table1<'a>) : DocExtractor<'a> = 
     withTableM askNextTable ma
 
 // *************************************
