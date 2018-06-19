@@ -1,7 +1,9 @@
 ﻿// Copyright (c) Stephen Tetley 2018
 // License: BSD 3 Clause
 
-module DocSoup.TableExtractor
+
+/// Extract from a single table.
+module DocSoup.TableExtractor1
 
 open System.Text.RegularExpressions
 open Microsoft.Office.Interop
@@ -11,77 +13,77 @@ open DocSoup.Base
 open System
 
 
-type TResult<'a> = 
-    | TErr of string
-    | TOk of 'a
+type T1Result<'a> = 
+    | T1Err of string
+    | T1Ok of 'a
 
-let private resultConcat (source:TResult<'a> list) : TResult<'a list> = 
+let private resultConcat (source:T1Result<'a> list) : T1Result<'a list> = 
     let rec work ac xs = 
         match xs with
-        | [] -> TOk <| List.rev ac
-        | TOk a::ys -> work (a::ac) ys
-        | TErr msg :: _ -> TErr msg
+        | [] -> T1Ok <| List.rev ac
+        | T1Ok a::ys -> work (a::ac) ys
+        | T1Err msg :: _ -> T1Err msg
     work [] source
 
 
 
-/// TableExtractor is intended to be minimal and only run 
+/// TableExtractor1 is intended to be minimal and only run 
 /// from DocExtractor
-/// TableExtractor is Reader(immutable)+Reader+Error
-type TableExtractor<'a> = 
-    TableExtractor of (Word.Table -> CellIndex -> TResult<'a>)
+/// TableExtractor1 is Reader(immutable)+Reader+Error
+type TableExtractor1<'a> = 
+    TableExtractor1 of (Word.Table -> CellIndex -> T1Result<'a>)
 
 
 
-let inline private apply1 (ma: TableExtractor<'a>) 
+let inline private apply1 (ma: TableExtractor1<'a>) 
                             (table: Word.Table)
-                            (pos: CellIndex) : TResult<'a>= 
-    let (TableExtractor f) = ma in f table pos
+                            (pos: CellIndex) : T1Result<'a>= 
+    let (TableExtractor1 f) = ma in f table pos
 
-let inline treturn (x:'a) : TableExtractor<'a> = 
-    TableExtractor <| fun _ _ -> TOk x
+let inline t1return (x:'a) : TableExtractor1<'a> = 
+    TableExtractor1 <| fun _ _ -> T1Ok x
 
 
-let inline private bindM (ma: TableExtractor<'a>) 
-                            (f: 'a -> TableExtractor<'b>) : TableExtractor<'b> =
-    TableExtractor <| fun table pos -> 
+let inline private bindM (ma: TableExtractor1<'a>) 
+                            (f: 'a -> TableExtractor1<'b>) : TableExtractor1<'b> =
+    TableExtractor1 <| fun table pos -> 
         match apply1 ma table pos with
-        | TErr msg -> TErr msg
-        | TOk a -> apply1 (f a) table pos
+        | T1Err msg -> T1Err msg
+        | T1Ok a -> apply1 (f a) table pos
 
-let inline tzero () : TableExtractor<'a> = 
-    TableExtractor <| fun _ _ -> TErr "tzero"
+let inline t1zero () : TableExtractor1<'a> = 
+    TableExtractor1 <| fun _ _ -> T1Err "t1zero"
 
 
-let inline private combineM (ma:TableExtractor<unit>) 
-                                (mb:TableExtractor<unit>) : TableExtractor<unit> = 
-    TableExtractor <| fun table pos -> 
+let inline private combineM (ma:TableExtractor1<unit>) 
+                                (mb:TableExtractor1<unit>) : TableExtractor1<unit> = 
+    TableExtractor1 <| fun table pos -> 
         match apply1 ma table pos with
-        | TErr msg -> TErr msg
-        | TOk a -> apply1 mb table pos
+        | T1Err msg -> T1Err msg
+        | T1Ok a -> apply1 mb table pos
 
 
-let inline private  delayM (fn:unit -> TableExtractor<'a>) : TableExtractor<'a> = 
-    bindM (treturn ()) fn 
+let inline private  delayM (fn:unit -> TableExtractor1<'a>) : TableExtractor1<'a> = 
+    bindM (t1return ()) fn 
 
 
 
 
-type TableExtractorBuilder() = 
-    member self.Return x            = treturn x
+type TableExtractor1Builder() = 
+    member self.Return x            = t1return x
     member self.Bind (p,f)          = bindM p f
-    member self.Zero ()             = tzero ()
+    member self.Zero ()             = t1zero ()
     member self.Combine (ma,mb)     = combineM ma mb
     member self.Delay fn            = delayM fn
 
 // Prefer "parse" to "parser" for the _Builder instance
 
-let (tableExtract:TableExtractorBuilder) = new TableExtractorBuilder()
+let (tableExtract:TableExtractor1Builder) = new TableExtractor1Builder()
 
 
 
-let (&>>=) (ma:TableExtractor<'a>) 
-            (fn:'a -> TableExtractor<'b>) : TableExtractor<'b> = 
+let (&>>=) (ma:TableExtractor1<'a>) 
+            (fn:'a -> TableExtractor1<'b>) : TableExtractor1<'b> = 
     bindM ma fn
 
 
@@ -92,96 +94,96 @@ let (&>>=) (ma:TableExtractor<'a>)
 
 
 
-let fmapM (fn:'a -> 'b) (ma:TableExtractor<'a>) : TableExtractor<'b> = 
-    TableExtractor <| fun table pos -> 
+let fmapM (fn:'a -> 'b) (ma:TableExtractor1<'a>) : TableExtractor1<'b> = 
+    TableExtractor1 <| fun table pos -> 
        match apply1 ma table pos with
-       | TErr msg -> TErr msg
-       | TOk a -> TOk (fn a)
+       | T1Err msg -> T1Err msg
+       | T1Ok a -> T1Ok (fn a)
 
 
-let mapM (p: 'a -> TableExtractor<'b>) (source:'a list) : TableExtractor<'b list> = 
-    TableExtractor <| fun table pos -> 
+let mapM (p: 'a -> TableExtractor1<'b>) (source:'a list) : TableExtractor1<'b list> = 
+    TableExtractor1 <| fun table pos -> 
         let rec work ac ys = 
             match ys with
-            | [] -> TOk (List.rev ac)
+            | [] -> T1Ok (List.rev ac)
             | z :: zs -> 
                 match apply1 (p z) table pos with
-                | TErr msg -> TErr msg
-                | TOk ans -> work (ans::ac) zs
+                | T1Err msg -> T1Err msg
+                | T1Ok ans -> work (ans::ac) zs
         work [] source
 
 /// Operator for fmap.
-let (&|>>>) (ma:TableExtractor<'a>) (fn:'a -> 'b) : TableExtractor<'b> = 
+let (&|>>>) (ma:TableExtractor1<'a>) (fn:'a -> 'b) : TableExtractor1<'b> = 
     fmapM fn ma
 
 /// Flipped fmap.
-let (<<<|&) (fn:'a -> 'b) (ma:TableExtractor<'a>) : TableExtractor<'b> = 
+let (<<<|&) (fn:'a -> 'b) (ma:TableExtractor1<'a>) : TableExtractor1<'b> = 
     fmapM fn ma
 
 
 
 /// Left biased choice
-let (<|||>) (ma:TableExtractor<'a>) (mb:TableExtractor<'a>) : TableExtractor<'a> = 
-    TableExtractor <| fun table pos -> 
+let (<|||>) (ma:TableExtractor1<'a>) (mb:TableExtractor1<'a>) : TableExtractor1<'a> = 
+    TableExtractor1 <| fun table pos -> 
         match apply1 ma table pos with
-        | TErr msg -> apply1 mb table pos
-        | TOk a -> TOk a
+        | T1Err msg -> apply1 mb table pos
+        | T1Ok a -> T1Ok a
 
 
 /// Optionally parses. When the parser fails return None and don't move the cursor position.
-let optional (ma:TableExtractor<'a>) : TableExtractor<'a option> = 
-    TableExtractor <| fun table pos ->
+let optional (ma:TableExtractor1<'a>) : TableExtractor1<'a option> = 
+    TableExtractor1 <| fun table pos ->
         match apply1 ma table pos with
-        | TErr _ -> TOk None
-        | TOk a -> TOk (Some a)
+        | T1Err _ -> T1Ok None
+        | T1Ok a -> T1Ok (Some a)
 
 
 // *************************************
 // Run function
 
-// Run a TableExtractor. 
-let runTableExtractor (ma:TableExtractor<'a>) (table:Word.Table) : TResult<'a> =
+// Run a TableExtractor1. 
+let runTableExtractor1 (ma:TableExtractor1<'a>) (table:Word.Table) : T1Result<'a> =
     try 
         let pos = CellIndex.First
         apply1 ma table pos
     with
-    | _ -> TErr "runTableExtractor"
+    | _ -> T1Err "runTableExtractor1"
 
 
 // *************************************
 // Errors
 
-let tableError (msg:string) : TableExtractor<'a> = 
-    TableExtractor <| fun _ _ -> TErr msg
+let tableError (msg:string) : TableExtractor1<'a> = 
+    TableExtractor1 <| fun _ _ -> T1Err msg
 
-let swapTableError (msg:string) (ma:TableExtractor<'a>) : TableExtractor<'a> = 
-    TableExtractor <| fun table pos ->
+let swapTableError (msg:string) (ma:TableExtractor1<'a>) : TableExtractor1<'a> = 
+    TableExtractor1 <| fun table pos ->
         match apply1 ma table pos with
-        | TErr _ -> TErr msg
-        | TOk a -> TOk a
+        | T1Err _ -> T1Err msg
+        | T1Ok a -> T1Ok a
 
-let assertCellInBounds (cell:CellIndex) : TableExtractor<unit> = 
-    TableExtractor <| fun table pos ->
+let assertCellInBounds (cell:CellIndex) : TableExtractor1<unit> = 
+    TableExtractor1 <| fun table pos ->
         if (cell.RowIx >= 1 && cell.RowIx <= table.Rows.Count) &&
             (cell.ColumnIx >= 1 && cell.ColumnIx <= table.Columns.Count) then 
-            TOk ()
+            T1Ok ()
         else
-            TErr "assertCellInBounds"
+            T1Err "assertCellInBounds"
 
 // *************************************
 // Retrieve input          
 
-let getTableText : TableExtractor<string> = 
-    TableExtractor <| fun table _ ->
-        TOk <| cleanRangeText table.Range
+let getTableText : TableExtractor1<string> = 
+    TableExtractor1 <| fun table _ ->
+        T1Ok <| cleanRangeText table.Range
 
-let getCellText : TableExtractor<string> = 
-    TableExtractor <| fun table pos ->
+let getCellText : TableExtractor1<string> = 
+    TableExtractor1 <| fun table pos ->
         try 
             let cell = table.Cell(pos.RowIx, pos.ColumnIx)
-            TOk <| cleanRangeText cell.Range
+            T1Ok <| cleanRangeText cell.Range
         with
-        | _ -> TErr "getCellText"
+        | _ -> T1Err "getCellText"
 
 
 // *************************************
@@ -189,27 +191,27 @@ let getCellText : TableExtractor<string> =
 
 let internal assertCellTest 
                 (test:string -> bool) 
-                (failCont:string ->TableExtractor<_>) : TableExtractor<unit> = 
+                (failCont:string ->TableExtractor1<_>) : TableExtractor1<unit> = 
     getCellText &>>= fun str ->
     if test str then 
-        treturn ()
+        t1return ()
     else
         failCont str
 
-let assertCellText (str:string) : TableExtractor<unit> = 
+let assertCellText (str:string) : TableExtractor1<unit> = 
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellText failed - found '%s'; expecting '%s'" cellText str
         tableError msg
     assertCellTest (fun s -> str.Equals(s)) errCont
 
-let assertCellMatches (pattern:string) : TableExtractor<unit> = 
+let assertCellMatches (pattern:string) : TableExtractor1<unit> = 
     let matchProc (str:string) = Regex.Match(str, pattern).Success
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellMatches failed - found '%s'; expecting match on '%s'" cellText pattern
         tableError msg
     assertCellTest matchProc errCont
 
-let assertCellEmpty : TableExtractor<unit> = 
+let assertCellEmpty : TableExtractor1<unit> = 
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellEmpty failed - found '%s'" cellText
         tableError msg
@@ -220,7 +222,7 @@ let assertCellEmpty : TableExtractor<unit> =
 
 // We expect string level parsers might fail. 
 // Use this with caution or use execFParsecFallback.
-let cellParse (parser:ParsecParser<'a>) : TableExtractor<'a> = 
+let cellParse (parser:ParsecParser<'a>) : TableExtractor1<'a> = 
     tableExtract { 
         let! text = getCellText
         let name = "none" 
@@ -231,7 +233,7 @@ let cellParse (parser:ParsecParser<'a>) : TableExtractor<'a> =
 
 
 // Returns fallback text if FParsec fails.
-let cellParseFallback (parser:ParsecParser<'a>) : TableExtractor<FParsecFallback<'a>> = 
+let cellParseFallback (parser:ParsecParser<'a>) : TableExtractor1<FParsecFallback<'a>> = 
     tableExtract { 
         let! text = getCellText
         let name = "none" 
@@ -245,19 +247,19 @@ let cellParseFallback (parser:ParsecParser<'a>) : TableExtractor<FParsecFallback
 // Control the focus
 
 
-let askCellPosition : TableExtractor<CellIndex> = 
-    TableExtractor <| fun _ pos -> TOk pos
+let askCellPosition : TableExtractor1<CellIndex> = 
+    TableExtractor1 <| fun _ pos -> T1Ok pos
 
 
 /// Restrict focus to a part of the input doc identified by region.
 /// Focus type stays the same
-let withCell (cell:CellIndex) (ma:TableExtractor<'a>) : TableExtractor<'a> = 
-    TableExtractor <| fun table _ -> 
+let withCell (cell:CellIndex) (ma:TableExtractor1<'a>) : TableExtractor1<'a> = 
+    TableExtractor1 <| fun table _ -> 
         apply1 ma table cell
 
 // Version of focus that binds the cell returned from a query.
-let withCellM (cellQuery:TableExtractor<CellIndex>) 
-                (ma:TableExtractor<'a>) : TableExtractor<'a> = 
+let withCellM (cellQuery:TableExtractor1<CellIndex>) 
+                (ma:TableExtractor1<'a>) : TableExtractor1<'a> = 
     cellQuery &>>= fun cell -> withCell cell ma
 
 
@@ -265,14 +267,14 @@ let withCellM (cellQuery:TableExtractor<CellIndex>)
 // Containing cell
 
 /// Return the cell containing needle.
-let containingCell (needle:Region) : TableExtractor<CellIndex> = 
-    TableExtractor <| fun table _ -> 
+let containingCell (needle:Region) : TableExtractor1<CellIndex> = 
+    TableExtractor1 <| fun table _ -> 
         let testCell (cell:Word.Cell) : bool = 
                 isSubregionOf (extractRegion cell.Range) needle
   
         match tryFindCell testCell table with 
-        | None -> TErr "containingCell - no match"
-        | Some cell -> TOk { RowIx = cell.RowIndex; ColumnIx = cell.ColumnIndex }
+        | None -> T1Err "containingCell - no match"
+        | Some cell -> T1Ok { RowIx = cell.RowIndex; ColumnIx = cell.ColumnIndex }
         
 
 
@@ -283,24 +285,24 @@ let containingCell (needle:Region) : TableExtractor<CellIndex> =
 /// Find one cell that contains the search string. 
 /// This is not guaranteed to be the first cell if there 
 /// are multiple matches.
-let findCell (search:string) (matchCase:bool) : TableExtractor<CellIndex> =
-    TableExtractor <| fun table pos -> 
+let findCell (search:string) (matchCase:bool) : TableExtractor1<CellIndex> =
+    TableExtractor1 <| fun table pos -> 
         match boundedFind1 search matchCase extractRegion table.Range with
         | Some region -> apply1 (containingCell region) table pos
-        | None -> TErr <| sprintf "findText - '%s' not found" search
+        | None -> T1Err <| sprintf "findText - '%s' not found" search
 
 /// Find one cell that matches the pattern. 
 /// This is not guaranteed to be the first cell if there 
 /// are multiple matches.
-let findCellByPattern (search:string) : TableExtractor<CellIndex> =
-    TableExtractor <| fun table pos -> 
+let findCellByPattern (search:string) : TableExtractor1<CellIndex> =
+    TableExtractor1 <| fun table pos -> 
         match boundedFindPattern1 search extractRegion table.Range with
         | Some region -> apply1 (containingCell region) table pos
-        | None -> TErr <| sprintf "findText - '%s' not found" search
+        | None -> T1Err <| sprintf "findText - '%s' not found" search
         
 /// Find all cells that contains the search string.
-let findCells (search:string) (matchCase:bool) : TableExtractor<CellIndex list> =
-    TableExtractor <| fun table pos -> 
+let findCells (search:string) (matchCase:bool) : TableExtractor1<CellIndex list> =
+    TableExtractor1 <| fun table pos -> 
         boundedFindMany search matchCase extractRegion table.Range
             |> List.map (fun region -> apply1 (containingCell region) table pos)
             |> resultConcat
@@ -308,8 +310,8 @@ let findCells (search:string) (matchCase:bool) : TableExtractor<CellIndex list> 
 
 
 /// Case sensitivity always appears to be true for Wildcard matches.
-let findCellsByPattern (search:string) : TableExtractor<CellIndex list> =
-    TableExtractor <| fun table pos ->  
+let findCellsByPattern (search:string) : TableExtractor1<CellIndex list> =
+    TableExtractor1 <| fun table pos ->  
         boundedFindPatternMany search extractRegion table.Range
             |> List.map (fun region -> apply1 (containingCell region) table pos)
             |> resultConcat
@@ -321,7 +323,7 @@ let findCellsByPattern (search:string) : TableExtractor<CellIndex list> =
 
 // Get the cell by index - must be in focus.
 // Note - indexing is from 1.
-let getCellByIndex (row:int) (col:int) : TableExtractor<CellIndex> = 
+let getCellByIndex (row:int) (col:int) : TableExtractor1<CellIndex> = 
     swapTableError "getCellByIndex" <| 
         tableExtract { 
             let cellIx = { RowIx = row; ColumnIx = col }
@@ -331,7 +333,7 @@ let getCellByIndex (row:int) (col:int) : TableExtractor<CellIndex> =
 
 
 
-let cellLeft (cell:CellIndex) : TableExtractor<CellIndex> = 
+let cellLeft (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellLeft" <| 
         tableExtract { 
             let c1 = cell.DecrCol
@@ -340,7 +342,7 @@ let cellLeft (cell:CellIndex) : TableExtractor<CellIndex> =
         }
 
 
-let cellRight (cell:CellIndex) : TableExtractor<CellIndex> = 
+let cellRight (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellRight" <| 
         tableExtract { 
             let c1 = cell.IncrCol
@@ -348,7 +350,7 @@ let cellRight (cell:CellIndex) : TableExtractor<CellIndex> =
             return c1
         }
 
-let cellBelow (cell:CellIndex) : TableExtractor<CellIndex> = 
+let cellBelow (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellBelow" <| 
         tableExtract { 
             let c1 = cell.IncrRow
@@ -356,7 +358,7 @@ let cellBelow (cell:CellIndex) : TableExtractor<CellIndex> =
             return c1
         }
 
-let cellAbove (cell:CellIndex) : TableExtractor<CellIndex> = 
+let cellAbove (cell:CellIndex) : TableExtractor1<CellIndex> = 
     swapTableError "cellAbove" <| 
         tableExtract { 
             let c1 = cell.DecrRow

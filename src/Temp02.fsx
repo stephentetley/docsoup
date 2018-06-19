@@ -10,10 +10,10 @@ open Microsoft.Office.Interop
 open FParsec
 
 #load @"DocSoup\Base.fs"
-#load @"DocSoup\TableExtractor.fs"
+#load @"DocSoup\TableExtractor1.fs"
 #load @"DocSoup\DocExtractor.fs"
 open DocSoup.Base
-open DocSoup.TableExtractor
+open DocSoup.TableExtractor1
 open DocSoup.DocExtractor
 
 let testDoc = @"G:\work\working\Survey1.docx"
