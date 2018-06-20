@@ -218,6 +218,11 @@ let row (ma:RowExtractor<'a>) : RowExtractor<'a> =
         with
         | _ -> RErr "row"
 
+let skip : RowExtractor<unit> = 
+    RowExtractor <| fun _ ix -> 
+        let ix1 = ix.IncrCol
+        ROk (ix1, ())
+            
 let cellAnything : RowExtractor<string> = 
     RowExtractor <| fun table ix -> 
         try 

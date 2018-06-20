@@ -8,6 +8,7 @@ open Microsoft.Office.Interop
 open FParsec
 
 open DocSoup.Base
+open DocSoup.RowExtractor
 open DocSoup.TableExtractor1
 
             
@@ -455,6 +456,23 @@ let parseTable (ma:Table1<'a>) : TablesExtractor<'a> =
         | _ -> Err "parseTable" 
 
         
+
+//// *************************************
+//// Run RowExtractor
+
+let parseTableRowwise (ma:RowExtractor<'a>) : TablesExtractor<'a> = 
+    TablesExtractor <| fun tables ix ->
+        try 
+            let table:Word.Table = tables.[ix]
+            match runRowExtractor ma table with
+            | RErr msg -> Err msg
+            | ROk (_,a) -> Ok (ix+1,a)
+        with
+        | _ -> Err "parseTable" 
+
+        
+
+
 
 
 //// *************************************
