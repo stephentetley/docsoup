@@ -10,6 +10,7 @@ open Microsoft.Office.Interop
 open FParsec
 
 #load @"DocSoup\Base.fs"
+#load @"DocSoup\RowExtractor.fs"
 #load @"DocSoup\TableExtractor1.fs"
 #load @"DocSoup\TablesExtractor.fs"
 open DocSoup.Base

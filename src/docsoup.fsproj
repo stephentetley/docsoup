@@ -54,6 +54,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="DocSoup\Base.fs" />
     <Compile Include="DocSoup\TableExtractor1.fs" />
+    <Compile Include="DocSoup\RowExtractor.fs" />
     <Compile Include="DocSoup\TablesExtractor.fs" />
     <Compile Include="DocSoup\DocExtractor.fs" />
     <Compile Include="SurveySyntax.fs" />

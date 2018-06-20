@@ -195,7 +195,7 @@ let (<??&>) (msg:string) (ma:Table1<'a>) : Table1<'a> =
 let assertCellInBounds (cell:CellIndex) : Table1<unit> = 
     Table1 <| fun table pos ->
         if (cell.RowIx >= 1 && cell.RowIx <= table.Rows.Count) &&
-            (cell.ColumnIx >= 1 && cell.ColumnIx <= table.Columns.Count) then 
+            (cell.ColIx >= 1 && cell.ColIx <= table.Columns.Count) then 
             T1Ok ()
         else
             T1Err "assertCellInBounds"
@@ -210,7 +210,7 @@ let getTableText : Table1<string> =
 let getCellText : Table1<string> = 
     Table1 <| fun table pos ->
         try 
-            let cell = table.Cell(pos.RowIx, pos.ColumnIx)
+            let cell = table.Cell(pos.RowIx, pos.ColIx)
             T1Ok <| cleanRangeText cell.Range
         with
         | _ -> T1Err "getCellText"
@@ -229,7 +229,7 @@ let getTableRegion : Table1<Region> =
 let getCellRegion : Table1<Region> = 
     Table1 <| fun table pos ->
         try 
-            let cell = table.Cell(pos.RowIx, pos.ColumnIx)
+            let cell = table.Cell(pos.RowIx, pos.ColIx)
             T1Ok <| extractRegion cell.Range
         with
         | _ -> T1Err "getCellRegion"
@@ -328,7 +328,7 @@ let containingCell (needle:Region) : Table1<CellIndex> =
   
         match tryFindCell testCell table with 
         | None -> T1Err "containingCell - no match"
-        | Some cell -> T1Ok { RowIx = cell.RowIndex; ColumnIx = cell.ColumnIndex }
+        | Some cell -> T1Ok { RowIx = cell.RowIndex; ColIx = cell.ColumnIndex }
         
 
 
@@ -380,7 +380,7 @@ let findCellsByPattern (search:string) : Table1<CellIndex list> =
 let getCellByIndex (row:int) (col:int) : Table1<CellIndex> = 
     swapTableError "getCellByIndex" <| 
         table1 { 
-            let cellIx = { RowIx = row; ColumnIx = col }
+            let cellIx = { RowIx = row; ColIx = col }
             let! _ = assertCellInBounds cellIx
             return cellIx
         }

@@ -115,15 +115,15 @@ let internal getTable (anchor:TableAnchor) (doc:Word.Document) : option<Word.Tab
 /// Fully user visible
 type CellIndex = 
     { RowIx: int
-      ColumnIx : int }
+      ColIx : int }
 
     /// Because tables are 1-indexed in word the default constructor is called 
     /// ``First`` rather than ``Zero``.
-    static member internal First = { RowIx = 1; ColumnIx = 1 }
+    static member internal First = { RowIx = 1; ColIx = 1 }
     member v.IncrRow = { v with RowIx = v.RowIx + 1 }
     member v.DecrRow = { v with RowIx = v.RowIx - 1 }
-    member v.IncrCol = { v with ColumnIx = v.ColumnIx + 1 }
-    member v.DecrCol = { v with ColumnIx = v.ColumnIx - 1 }
+    member v.IncrCol = { v with ColIx = v.ColIx + 1 }
+    member v.DecrCol = { v with ColIx = v.ColIx - 1 }
 
 type CellAnchor = 
     internal 
@@ -131,7 +131,7 @@ type CellAnchor =
           CellIx: CellIndex }
     member internal x.TableAnchor : TableAnchor = x.TableIx
     member internal x.Row : int = x.CellIx.RowIx
-    member internal x.Column : int = x.CellIx.ColumnIx
+    member internal x.Column : int = x.CellIx.ColIx
 
 
 let internal getCell (anchor:CellAnchor) (doc:Word.Document) : option<Word.Cell> = 
