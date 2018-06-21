@@ -9,7 +9,6 @@ open FParsec
 
 open DocSoup.Base
 open DocSoup.RowExtractor
-open DocSoup.TableExtractor1
 
             
 type TableIx = int
@@ -442,25 +441,12 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 
 
 
-//// *************************************
-//// Run tableExtractor1
 
-let parseTable (ma:Table1<'a>) : TablesExtractor<'a> = 
-    TablesExtractor <| fun tables ix ->
-        try 
-            let table:Word.Table = tables.[ix]
-            match runTable1 ma table with
-            | T1Err msg -> Err msg
-            | T1Ok a -> Ok (ix+1,a)
-        with
-        | _ -> Err "parseTable" 
-
-        
 
 //// *************************************
 //// Run RowExtractor
 
-let parseTableRowwise (ma:RowExtractor<'a>) : TablesExtractor<'a> = 
+let parseTable (ma:RowExtractor<'a>) : TablesExtractor<'a> = 
     TablesExtractor <| fun tables ix ->
         try 
             let table:Word.Table = tables.[ix]

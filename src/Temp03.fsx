@@ -11,7 +11,6 @@ open FParsec
 
 #load @"DocSoup\Base.fs"
 #load @"DocSoup\RowExtractor.fs"
-#load @"DocSoup\TableExtractor1.fs"
 #load @"DocSoup\TablesExtractor.fs"
 open DocSoup
 open DocSoup.RowExtractor
@@ -23,7 +22,7 @@ let testDoc2 = @"G:\work\working\Survey2.docx"
 
 let test01 () = 
     let procM : TablesExtractor<_> = 
-        manyTill (parseTable TableExtractor1.getTableRegion) eof
+        manyTill (parseTable RowExtractor.getTableDimensions) eof
     runOnFileE procM testDoc |> printfn "Ans: '%A'"
 
 let table1 : RowExtractor<string * string> = 
@@ -36,6 +35,6 @@ let table1 : RowExtractor<string * string> =
 
 let test02 () = 
     let procM : TablesExtractor<_> = 
-        parseTableRowwise table1
+        parseTable table1
     runOnFileE procM testDoc |> printfn "Ans: '%A'"
 

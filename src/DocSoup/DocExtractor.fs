@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Stephen Tetley 2018
 // License: BSD 3 Clause
 
+
+/// OBSOLETE
 module DocSoup.DocExtractor
 
 open System.Text.RegularExpressions
@@ -8,7 +10,7 @@ open Microsoft.Office.Interop
 open FParsec
 
 open DocSoup.Base
-open DocSoup.TableExtractor1
+open DocSoup.RowExtractor
 
             
 type Cursor = int
@@ -472,20 +474,22 @@ let runOnFileE (ma:DocExtractor<'a>) (fileName:string) : 'a =
 // *************************************
 // Run tableExtractor
 
-let withTable (anchor:TableAnchor) (ma:Table1<'a>) : DocExtractor<'a> = 
+let withTable (anchor:TableAnchor) 
+                (ma:RowExtractor<'a>) : DocExtractor<'a> = 
     DocExtractor <| fun doc _ ->
         try 
             let table:Word.Table = doc.Tables.Item(anchor.Index)
-            match runTable1 ma table with
-            | T1Err msg -> Err msg
-            | T1Ok a -> 
+            match runRowExtractor ma table with
+            | RErr msg -> Err msg
+            | ROk (_,a) -> 
                 let pos1 = table.Range.End + 1
                 Ok (pos1,a)
         with
         | _ -> Err "withTable" 
 
         
-let withTableM (anchorQuery:DocExtractor<TableAnchor>) (ma:Table1<'a>) : DocExtractor<'a> = 
+let withTableM (anchorQuery:DocExtractor<TableAnchor>) 
+                (ma:RowExtractor<'a>) : DocExtractor<'a> = 
     anchorQuery >>>= fun a -> withTable a ma 
 
 // Now we have a cursor we can have a nextTable function.
@@ -511,7 +515,7 @@ let askNextTable : DocExtractor<TableAnchor> =
 
 
 /// Note - this is unguarded, use with care in many, many1 etc. 
-let nextTable (ma:Table1<'a>) : DocExtractor<'a> = 
+let nextTable (ma:RowExtractor<'a>) : DocExtractor<'a> = 
     withTableM askNextTable ma
 
 // *************************************

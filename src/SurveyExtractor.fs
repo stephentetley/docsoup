@@ -5,12 +5,11 @@
 module SurveyExtractor
 
 open DocSoup.Base
-open DocSoup.TableExtractor1
+open DocSoup.RowExtractor
 open DocSoup.TablesExtractor
 open DocSoup
 
 open SurveySyntax
-open System.Security.Policy
 
 
 // Note - layout changes are expected for the input documents we are querying here.
@@ -36,33 +35,33 @@ let sw (msg:string) (ma:TablesExtractor<'a>) : TablesExtractor<'a> =
 // *************************************
 // Utility parsers
 
-/// Returns "" if no cell matches the search.
-let getFieldValue (search:string) (matchCase:bool) : Table1<string> = 
-    let good = 
-        withCellM (findCell search matchCase &>>= cellRight) <| getCellText
-    good <|||> t1return ""
+///// Returns "" if no cell matches the search.
+//let getFieldValue (search:string) (matchCase:bool) : Table1<string> = 
+//    let good = 
+//        withCellM (findCell search matchCase &>>= cellRight) <| getCellText
+//    good <|||> t1return ""
 
-/// Returns "" if no cell matches the search.
-/// This speeds things up a bit, but for our use case here we are
-/// concerned about layout changes.
-let getFieldValueByRow (row:int) : Table1<string> = 
-    let good = 
-        withCellM (getCellByIndex row 2) <| getCellText
-    good <|||> t1return ""
-
-
-/// Returns "" if no cell matches the search.
-let getFieldValuePattern (search:string) : Table1<string> = 
-    let good = 
-        withCellM (findCellByPattern search &>>= cellRight) <| getCellText
-    good <|||> t1return ""
+///// Returns "" if no cell matches the search.
+///// This speeds things up a bit, but for our use case here we are
+///// concerned about layout changes.
+//let getFieldValueByRow (row:int) : Table1<string> = 
+//    let good = 
+//        withCellM (getCellByIndex row 2) <| getCellText
+//    good <|||> t1return ""
 
 
-let assertHeaderCell (str:string) : Table1<unit> = 
+///// Returns "" if no cell matches the search.
+//let getFieldValuePattern (search:string) : Table1<string> = 
+//    let good = 
+//        withCellM (findCellByPattern search &>>= cellRight) <| getCellText
+//    good <|||> t1return ""
+
+
+let assertHeaderCell (str:string) : RowExtractor<unit> = 
     withCellM (getCellByIndex 1 1) <| assertCellText str
 
     
-let assertHeaderCellPattern (pattern:string) : Table1<unit> = 
+let assertHeaderCellPattern (pattern:string) : RowExtractor<unit> = 
     withCellM (getCellByIndex 1 1) <| assertCellMatches pattern
 
 let ignoreTable (tableHeader:string) : TablesExtractor<unit> = 
