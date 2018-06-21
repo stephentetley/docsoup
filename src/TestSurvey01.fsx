@@ -31,6 +31,7 @@ let processSite(folderPath:string) : unit  =
     System.IO.DirectoryInfo(folderPath).GetFiles(searchPattern = "*Survey.docx")
         |> Array.iter (fun (info:System.IO.FileInfo) -> processSurvey info.FullName)
 
+
 let main () : unit = 
     let root = @"G:\work\Projects\events2\surveys_returned"
     System.IO.DirectoryInfo(root).GetDirectories ()

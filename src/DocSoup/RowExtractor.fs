@@ -110,7 +110,7 @@ let (parseRows:RowExtractorBuilder) = new RowExtractorBuilder ()
 
 
 
-let (&>>=) (ma:RowExtractor<'nav,'a>) 
+let (&>>>=) (ma:RowExtractor<'nav,'a>) 
             (fn:'a -> RowExtractor<'nav,'b>) : RowExtractor<'nav,'b> = 
     bindM ma fn
 
@@ -245,16 +245,21 @@ let runRowExtractor (ma:RowExtractor<'nav,'a>) (table:Word.Table) : RowResult<'a
 // *************************************
 // Get cell text 
 
-let cellText : CellParser<string> = 
+
+let private cellRange : CellParser<Word.Range> = 
     RowExtractor <| fun table ix -> 
         try 
             let cell : Word.Cell = 
                 table.Cell(Row = ix.RowIx, Column = ix.ColIx)
-            let text = cleanRangeText cell.Range
             let ix1 = { ix with ColIx = ix.ColIx+1 }
-            ROk (ix1, text)
+            ROk (ix1, cell.Range)
         with
-        | _ -> RErr "cellText"
+        | _ -> RErr "cellRange"
+
+
+
+let cellText : CellParser<string> = 
+    swapRowError "cellText" <| fmapM cleanRangeText cellRange
 
 
 
@@ -402,7 +407,7 @@ let assertInBounds () : RowExtractor<'nav,unit> =
 let internal assertCellTest 
                 (test:string -> bool) 
                 (failCont:string ->CellParser<_>) : CellParser<unit> = 
-    cellText &>>= fun str ->
+    cellText &>>>= fun str ->
     if test str then 
         rereturn ()
     else
@@ -414,18 +419,29 @@ let assertCellText (str:string) : CellParser<unit> =
         rowError msg
     assertCellTest (fun s -> str.Equals(s)) errCont
 
-let assertCellMatches (pattern:string) : CellParser<unit> = 
-    let matchProc (str:string) = Regex.Match(str, pattern).Success
+
+/// Assert the current cell matches the pattern
+/// This is a full Regexp pattern not a Word pattern
+let assertCellRegex (regexpPattern:string) : CellParser<unit> = 
+    let matchProc (str:string) = Regex.Match(str, regexpPattern).Success
     let errCont (cellText:string) = 
-        let msg = sprintf "assertCellMatches failed - found '%s'; expecting match on '%s'" cellText pattern
+        let msg = sprintf "assertCellMatches failed - found '%s'; expecting match on '%s'" cellText regexpPattern
         rowError msg
     assertCellTest matchProc errCont
+
+let assertCellWordMatch (wordPattern:string) : CellParser<unit> = 
+    cellRange &>>>= fun (rng:Word.Range) -> 
+        match boundedFindPattern1 wordPattern id rng with
+        | Some _ -> rereturn ()
+        | None -> rowError "assertCellWordMatch"
+
 
 let assertCellEmpty : CellParser<unit> = 
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellEmpty failed - found '%s'" cellText
         rowError msg
     assertCellTest (fun str -> str.Length = 0) errCont
+
 
 let assertCellTextNot (str:string) : CellParser<unit> = 
     let errCont (cellText:string) = 
@@ -441,7 +457,7 @@ let assertCellTextNot (str:string) : CellParser<unit> =
 /// We expect string level parsers might fail. 
 /// Use this with caution or use execFParsecFallback.
 let cellParse (parser:ParsecParser<'a>) : CellParser<'a> = 
-    cellText &>>= fun text -> 
+    cellText &>>>= fun text -> 
         let name = "none" 
         match runParserOnString parser () name text with
         | Success(ans,_,_) -> rereturn ans
@@ -451,7 +467,7 @@ let cellParse (parser:ParsecParser<'a>) : CellParser<'a> =
 
 // Returns fallback text if FParsec fails.
 let cellParseFallback (parser:ParsecParser<'a>) : CellParser<FParsecFallback<'a>> = 
-    cellText &>>= fun text -> 
+    cellText &>>>= fun text -> 
         let name = "none" 
         match runParserOnString parser () name text with
         | Success(ans,_,_) -> rereturn (FParsecOk ans)
@@ -475,7 +491,7 @@ let endOfRow : CellParser<unit> =
         try 
             let rowCells:Word.Cells = table.Rows.Item(ix.RowIx).Cells
             let cellCount = rowCells.Count
-            if ix.ColIx > cellCount + 1 then 
+            if ix.ColIx > cellCount then 
                 ROk (ix, ())
             else
                 RErr "endOfRow (not at end)"

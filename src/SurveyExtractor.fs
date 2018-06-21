@@ -39,13 +39,13 @@ let rowOf1 (exactMatch:string) : RowParser<unit> =
     row (assertCellText exactMatch &>>>. endOfRow)
 
 let rowOf1Matching (patternMatch:string) : RowParser<unit> = 
-    row (assertCellMatches patternMatch &>>>. endOfRow)
+    row (assertCellWordMatch patternMatch &>>>. endOfRow)
 
 let rowOf2 (exactMatch:string) : RowParser<string> = 
     row (assertCellText exactMatch &>>>. cellText)
 
 let rowOf2Matching (patternMatch:string) : RowParser<string> = 
-    row (assertCellMatches patternMatch &>>>. cellText)
+    row (assertCellWordMatch patternMatch &>>>. cellText)
 
 
 let tableNot (tableHeader:string) : TablesExtractor<unit> = 
