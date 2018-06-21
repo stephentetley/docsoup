@@ -57,30 +57,30 @@ let sw (msg:string) (ma:TablesExtractor<'a>) : TablesExtractor<'a> =
 //    good <|||> t1return ""
 
 
-let assertHeaderCell (str:string) : RowExtractor<unit> = 
-    withCellM (getCellByIndex 1 1) <| assertCellText str
+//let assertHeaderCell (str:string) : RowExtractor<unit> = 
+//    withCellM (getCellByIndex 1 1) <| assertCellText str
 
     
-let assertHeaderCellPattern (pattern:string) : RowExtractor<unit> = 
-    withCellM (getCellByIndex 1 1) <| assertCellMatches pattern
+//let assertHeaderCellPattern (pattern:string) : RowExtractor<unit> = 
+//    withCellM (getCellByIndex 1 1) <| assertCellMatches pattern
 
-let ignoreTable (tableHeader:string) : TablesExtractor<unit> = 
-    parseTable (assertHeaderCell tableHeader)
+//let ignoreTable (tableHeader:string) : TablesExtractor<unit> = 
+//    parseTable (assertHeaderCell tableHeader)
 
-let tableNot (tableHeader:string) : TablesExtractor<unit> = 
-    parseTable (assertCellTextNot tableHeader)
+//let tableNot (tableHeader:string) : TablesExtractor<unit> = 
+//    parseTable (assertCellTextNot tableHeader)
 
 
 // *************************************
 // Survey parsers
 
-let extractSiteDetails : Table1<SiteInfo> = 
-    table1 { 
-        do! assertHeaderCell "Site Details"
-        let! sname          = getFieldValue "Site Name" false
-        let! uid            = getFieldValue "SAI Number" false
-        let! discharge      = getFieldValue "Discharge Name" false
-        let! watercourse    = getFieldValue "Receiving Watercourse" false
+let extractSiteDetails : RowParser<SiteInfo> = 
+    parseRows { 
+        do! row (assertCellText "Site Details")
+        let! sname          = row (assertCellText "Site Name" &>>>. cellText)
+        let! uid            = row (assertCellText "SAI Number" &>>>. cellText)
+        let! discharge      = row (assertCellText "Discharge Name" &>>>. cellText)
+        let! watercourse    = row (assertCellText "Receiving Watercourse" &>>>. cellText)
         return {
             SiteName = sname
             SaiNumber = uid
@@ -90,7 +90,7 @@ let extractSiteDetails : Table1<SiteInfo> =
     }
 
 
-let extractSurveyInfo : Table1<SurveyInfo> = 
+let extractSurveyInfo : RowParser<SurveyInfo> = 
     table1 { 
         do! assertHeaderCell "Survey Information"
         let! name       = getFieldValue "Engineer Name" false

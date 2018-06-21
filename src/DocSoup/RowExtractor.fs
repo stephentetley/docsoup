@@ -32,65 +32,70 @@ type RowResult<'a> =
     | ROk of CellIndex * 'a
 
 
+type RowPhantom = class end
+type CellPhantom = class end
 
 
 /// RowExtractor is intended to be minimal and only run from TablesExtractor
 /// RowExtractor is Reader(immutable)+State+Error
-type RowExtractor<'a> = 
+type RowExtractor<'nav,'a> = 
     RowExtractor of (Word.Table -> CellIndex -> RowResult<'a>)
 
+type RowParser<'a> = RowExtractor<RowPhantom, 'a>
+type CellParser<'a> = RowExtractor<CellPhantom, 'a>
 
 
-let inline private apply1 (ma: RowExtractor<'a>) 
+let inline private apply1 (ma: RowExtractor<'nav, 'a>) 
                             (table: Word.Table)
                             (ix: CellIndex) : RowResult<'a>= 
     let (RowExtractor f) = ma in f table ix
 
-let inline rereturn (x:'a) : RowExtractor<'a> = 
+let inline rereturn (x:'a) : RowExtractor<'nav,'a> = 
     RowExtractor <| fun _ ix -> ROk(ix,x)
 
 
-let inline private bindM (ma: RowExtractor<'a>) 
-                            (f: 'a -> RowExtractor<'b>) : RowExtractor<'b> =
+let inline private bindM (ma: RowExtractor<'nav,'a>) 
+                            (f: 'a -> RowExtractor<'nav,'b>) : RowExtractor<'nav,'b> =
     RowExtractor <| fun table ix -> 
         match apply1 ma table ix with
         | RErr msg -> RErr msg
         | ROk (ix1,a) -> apply1 (f a) table ix1
 
 
-let inline rezero () : RowExtractor<'a> = 
+let inline rezero () : RowExtractor<'nav,'a> = 
     RowExtractor <| fun _ _ -> RErr "rzero"
 
 
-let inline private combineM (ma:RowExtractor<unit>) 
-                                (mb:RowExtractor<unit>) : RowExtractor<unit> = 
+let inline private combineM (ma:RowExtractor<'nav,unit>) 
+                                (mb:RowExtractor<'nav,unit>) : RowExtractor<'nav,unit> = 
     RowExtractor <| fun table ix -> 
         match apply1 ma table ix with
         | RErr msg -> RErr msg
         | ROk (ix1,a) -> apply1 mb table ix1
 
 
-let inline private  delayM (fn:unit -> RowExtractor<'a>) : RowExtractor<'a> = 
+let inline private  delayM (fn:unit -> RowExtractor<'nav,'a>) : RowExtractor<'nav,'a> = 
     bindM (rereturn ()) fn 
 
 
 
 
-type RowExtractorBuilder() = 
+type RowExtractorBuilder () = 
     member self.Return x            = rereturn x
     member self.Bind (p,f)          = bindM p f
     member self.Zero ()             = rezero ()
     member self.Combine (ma,mb)     = combineM ma mb
     member self.Delay fn            = delayM fn
 
+
 // Prefer "parse" to "parser" for the _Builder instance
 
-let (parseRows:RowExtractorBuilder) = new RowExtractorBuilder()
+let (parseRows:RowExtractorBuilder) = new RowExtractorBuilder ()
 
 
 
-let (&>>=) (ma:RowExtractor<'a>) 
-            (fn:'a -> RowExtractor<'b>) : RowExtractor<'b> = 
+let (&>>=) (ma:RowExtractor<'nav,'a>) 
+            (fn:'a -> RowExtractor<'nav,'b>) : RowExtractor<'nav,'b> = 
     bindM ma fn
 
 
@@ -98,20 +103,20 @@ let (&>>=) (ma:RowExtractor<'a>)
 // *************************************
 // Errors
 
-let rowError (msg:string) : RowExtractor<'a> = 
+let rowError (msg:string) : RowExtractor<'nav,'a> = 
     RowExtractor <| fun _ _ -> RErr msg
 
-let swapRowError (msg:string) (ma:RowExtractor<'a>) : RowExtractor<'a> = 
+let swapRowError (msg:string) (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a> = 
     RowExtractor <| fun table ix ->
         match apply1 ma table ix with
         | RErr _ -> RErr msg
         | ROk (ix1,a) -> ROk (ix1,a)
 
 
-let (<&??>) (ma:RowExtractor<'a>) (msg:string) : RowExtractor<'a> = 
+let (<&??>) (ma:RowExtractor<'nav,'a>) (msg:string) : RowExtractor<'nav,'a> = 
     swapRowError msg ma
 
-let (<??&>) (msg:string) (ma:RowExtractor<'a>) : RowExtractor<'a> = 
+let (<??&>) (msg:string) (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a> = 
     swapRowError msg ma
 
 
@@ -124,7 +129,7 @@ let (<??&>) (msg:string) (ma:RowExtractor<'a>) : RowExtractor<'a> =
 
 
 
-let fmapM (fn:'a -> 'b) (ma:RowExtractor<'a>) : RowExtractor<'b> = 
+let fmapM (fn:'a -> 'b) (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'b> = 
     RowExtractor <| fun table ix -> 
        match apply1 ma table ix with
        | RErr msg -> RErr msg
@@ -132,15 +137,15 @@ let fmapM (fn:'a -> 'b) (ma:RowExtractor<'a>) : RowExtractor<'b> =
 
 
 /// Operator for fmap.
-let (&|>>>) (ma:RowExtractor<'a>) (fn:'a -> 'b) : RowExtractor<'b> = 
+let (&|>>>) (ma:RowExtractor<'nav,'a>) (fn:'a -> 'b) : RowExtractor<'nav,'b> = 
     fmapM fn ma
 
 /// Flipped fmap.
-let (<<<|&) (fn:'a -> 'b) (ma:RowExtractor<'a>) : RowExtractor<'b> = 
+let (<<<|&) (fn:'a -> 'b) (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'b> = 
     fmapM fn ma
 
 
-let mapM (p: 'a -> RowExtractor<'b>) (source:'a list) : RowExtractor<'b list> = 
+let mapM (p: 'a -> RowExtractor<'nav,'b>) (source:'a list) : RowExtractor<'nav,'b list> = 
     RowExtractor <| fun table ix0 -> 
         let rec work ix ac ys = 
             match ys with
@@ -155,7 +160,8 @@ let mapM (p: 'a -> RowExtractor<'b>) (source:'a list) : RowExtractor<'b list> =
 
 
 /// Left biased choice
-let (<|||>) (ma:RowExtractor<'a>) (mb:RowExtractor<'a>) : RowExtractor<'a> = 
+let (<|||>) (ma:RowExtractor<'nav,'a>) 
+            (mb:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a> = 
     RowExtractor <| fun table ix -> 
         match apply1 ma table ix with
         | RErr msg -> apply1 mb table ix
@@ -163,14 +169,15 @@ let (<|||>) (ma:RowExtractor<'a>) (mb:RowExtractor<'a>) : RowExtractor<'a> =
 
 
 /// Optionally parses. When the parser fails return None and don't move the cursor position.
-let optional (ma:RowExtractor<'a>) : RowExtractor<'a option> = 
+let optional (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a option> = 
     RowExtractor <| fun table ix ->
         match apply1 ma table ix with
         | RErr _ -> ROk (ix, None)
         | ROk (ix1,a) -> ROk (ix1, Some a)
 
 /// Perform two actions in sequence. Ignore the results of the second action if both succeed.
-let seqL (ma:RowExtractor<'a>) (mb:RowExtractor<'b>) : RowExtractor<'a> = 
+let seqL (ma:RowExtractor<'nav,'a>) 
+            (mb:RowExtractor<'nav,'b>) : RowExtractor<'nav,'a> = 
     parseRows { 
         let! a = ma
         let! _ = mb
@@ -178,25 +185,30 @@ let seqL (ma:RowExtractor<'a>) (mb:RowExtractor<'b>) : RowExtractor<'a> =
     }
 
 /// Perform two actions in sequence. Ignore the results of the first action if both succeed.
-let seqR (ma:RowExtractor<'a>) (mb:RowExtractor<'b>) : RowExtractor<'b> = 
+let seqR (ma:RowExtractor<'nav,'a>) 
+            (mb:RowExtractor<'nav,'b>) : RowExtractor<'nav,'b> = 
     parseRows { 
         let! _ = ma
         let! b = mb
         return b
     }
 
-let (.&>>>) (ma:RowExtractor<'a>) (mb:RowExtractor<'b>) : RowExtractor<'a> = 
+let (.&>>>) (ma:RowExtractor<'nav,'a>) 
+                (mb:RowExtractor<'nav,'b>) : RowExtractor<'nav,'a> = 
     seqL ma mb
 
-let (&>>>.) (ma:RowExtractor<'a>) (mb:RowExtractor<'b>) : RowExtractor<'b> = 
+let (&>>>.) (ma:RowExtractor<'nav,'a>) 
+                (mb:RowExtractor<'nav,'b>) : RowExtractor<'nav,'b> = 
     seqR ma mb
 
+// let manyR (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a list> = 
+    
 
 // *************************************
 // Run function
 
 /// Run a RowExtractor. 
-let runRowExtractor (ma:RowExtractor<'a>) (table:Word.Table) : RowResult<'a> =
+let runRowExtractor (ma:RowExtractor<'nav,'a>) (table:Word.Table) : RowResult<'a> =
     try 
         let ix = CellIndex.First
         apply1 ma table ix
@@ -207,7 +219,7 @@ let runRowExtractor (ma:RowExtractor<'a>) (table:Word.Table) : RowResult<'a> =
 // *************************************
 // Navigation
 
-let row (ma:RowExtractor<'a>) : RowExtractor<'a> = 
+let row (ma:CellParser<'a>) : RowParser<'a> = 
     RowExtractor <| fun table ix -> 
         try
             match apply1 ma table ix with
@@ -218,12 +230,17 @@ let row (ma:RowExtractor<'a>) : RowExtractor<'a> =
         with
         | _ -> RErr "row"
 
-let skip : RowExtractor<unit> = 
+let skipCell : CellParser<unit> = 
     RowExtractor <| fun _ ix -> 
         let ix1 = ix.IncrCol
         ROk (ix1, ())
+
+let skipRow : RowParser<unit> = 
+    RowExtractor <| fun _ ix -> 
+        let ix1 = ix.IncrRow
+        ROk (ix1, ())
             
-let cellAnything : RowExtractor<string> = 
+let cellText : CellParser<string> = 
     RowExtractor <| fun table ix -> 
         try 
             let cell : Word.Cell = 
@@ -232,19 +249,19 @@ let cellAnything : RowExtractor<string> =
             let ix1 = { ix with ColIx = ix.ColIx+1 }
             ROk (ix1, text)
         with
-        | _ -> RErr "cellAnything"
+        | _ -> RErr "cellText"
 
 
 
 // *************************************
 // Metric info
 
-let getTableDimensions : RowExtractor<int * int> = 
+let getTableDimensions : RowParser<int * int> = 
     RowExtractor <| fun table ix ->
         ROk (ix, (table.Rows.Count, table.Columns.Count))
         
-/// Cell count (coulmns) of current row.
-let getCellCount : RowExtractor<int> = 
+/// Cell count (columns) of current row.
+let getCellCount : CellParser<int> = 
     RowExtractor <| fun table ix -> 
         try 
             let rowCells:Word.Cells = table.Rows.Item(ix.RowIx).Cells
@@ -257,7 +274,7 @@ let getCellCount : RowExtractor<int> =
 // Assert        
 
 
-let assertInBounds  : RowExtractor<unit> = 
+let assertInBounds () : RowExtractor<'nav,unit> = 
     RowExtractor <| fun table ix ->
         if (ix.RowIx >= 1 && ix.RowIx <= table.Rows.Count) &&
             (ix.ColIx >= 1 && ix.ColIx <= table.Columns.Count) then 
@@ -268,33 +285,33 @@ let assertInBounds  : RowExtractor<unit> =
 
 let internal assertCellTest 
                 (test:string -> bool) 
-                (failCont:string ->RowExtractor<_>) : RowExtractor<unit> = 
-    cellAnything &>>= fun str ->
+                (failCont:string ->CellParser<_>) : CellParser<unit> = 
+    cellText &>>= fun str ->
     if test str then 
         rereturn ()
     else
         failCont str
 
-let assertCellText (str:string) : RowExtractor<unit> = 
+let assertCellText (str:string) : CellParser<unit> = 
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellText failed - found '%s'; expecting '%s'" cellText str
         rowError msg
     assertCellTest (fun s -> str.Equals(s)) errCont
 
-let assertCellMatches (pattern:string) : RowExtractor<unit> = 
+let assertCellMatches (pattern:string) : CellParser<unit> = 
     let matchProc (str:string) = Regex.Match(str, pattern).Success
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellMatches failed - found '%s'; expecting match on '%s'" cellText pattern
         rowError msg
     assertCellTest matchProc errCont
 
-let assertCellEmpty : RowExtractor<unit> = 
+let assertCellEmpty : CellParser<unit> = 
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellEmpty failed - found '%s'" cellText
         rowError msg
     assertCellTest (fun str -> str.Length = 0) errCont
 
-let assertCellTextNot (str:string) : RowExtractor<unit> = 
+let assertCellTextNot (str:string) : CellParser<unit> = 
     let errCont (cellText:string) = 
         let msg = sprintf "assertCellText failed - found '%s'; expecting '%s'" cellText str
         rowError msg
@@ -307,8 +324,8 @@ let assertCellTextNot (str:string) : RowExtractor<unit> =
 
 /// We expect string level parsers might fail. 
 /// Use this with caution or use execFParsecFallback.
-let cellParse (parser:ParsecParser<'a>) : RowExtractor<'a> = 
-    cellAnything &>>= fun text -> 
+let cellParse (parser:ParsecParser<'a>) : CellParser<'a> = 
+    cellText &>>= fun text -> 
         let name = "none" 
         match runParserOnString parser () name text with
         | Success(ans,_,_) -> rereturn ans
@@ -317,8 +334,8 @@ let cellParse (parser:ParsecParser<'a>) : RowExtractor<'a> =
 
 
 // Returns fallback text if FParsec fails.
-let cellParseFallback (parser:ParsecParser<'a>) : RowExtractor<FParsecFallback<'a>> = 
-    cellAnything &>>= fun text -> 
+let cellParseFallback (parser:ParsecParser<'a>) : CellParser<FParsecFallback<'a>> = 
+    cellText &>>= fun text -> 
         let name = "none" 
         match runParserOnString parser () name text with
         | Success(ans,_,_) -> rereturn (FParsecOk ans)
@@ -330,14 +347,14 @@ let cellParseFallback (parser:ParsecParser<'a>) : RowExtractor<FParsecFallback<'
 // Introspect the position
 
 /// row * column
-let askCellPosition : RowExtractor<int * int> = 
+let askCellPosition : CellParser<int * int> = 
     RowExtractor <| fun _ ix -> ROk (ix, (ix.RowIx, ix.ColIx))
 
 
 
 /// Note row "width" is dynamic, this means the count acknowledges 
 /// coalesced cells
-let endOfRow : RowExtractor<unit> = 
+let endOfRow : CellParser<unit> = 
     RowExtractor <| fun table ix -> 
         try 
             let rowCells:Word.Cells = table.Rows.Item(ix.RowIx).Cells
@@ -349,7 +366,7 @@ let endOfRow : RowExtractor<unit> =
         with
         | _ -> RErr "endOfRow (system failure)"
 
-let endOfTable : RowExtractor<unit> = 
+let endOfTable : RowParser<unit> = 
     RowExtractor <| fun table ix -> 
         try
             let rowCells:Word.Cells = table.Rows.Item(ix.RowIx).Cells

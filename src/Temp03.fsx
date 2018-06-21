@@ -27,8 +27,8 @@ let test01 () =
 
 let table1 : RowExtractor<string * string> = 
     parseRows { 
-        let! title  = row (cellAnything)
-        let! name   = row (skip &>>>. cellAnything) 
+        let! title  = row (cellText)
+        let! name   = row (skip &>>>. cellText) 
         return title, name
     }
 
