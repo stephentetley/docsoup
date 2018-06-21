@@ -133,6 +133,14 @@ let test06 () =
     run procM testDoc
 
 
+let test07 () = 
+    let procM (doc:Word.Document) = 
+        let table1 = doc.Tables.Item(1)
+        let cell = table1.Cell(14, 80)
+        printfn "%s" cell.Range.Text
+    run procM testDoc
+
+
 // Does sepBy (optionally) terminate?
 let testFParsec01 () = 
     let parser = 

@@ -424,12 +424,20 @@ let runOnFile (ma:TablesExtractor<'a>) (fileName:string) : Result<'a> =
             app.Quit()
             ans
         with
-        | ex -> 
+        | FatalParseError msg -> 
             try 
                 app.Quit ()
-                Err ex.Message
+                Err msg
             with
-            | _ -> Err ex.Message                
+            | _ -> Err msg
+
+        | ex -> 
+            let msg = sprintf "SYSTEM ERROR: %A\n====================\n%s" (ex.GetType())  ex.Message
+            try 
+                app.Quit ()
+                Err msg
+            with
+            | _ -> Err msg
     else 
         Err <| sprintf "Cannot find file %s" fileName
 
@@ -454,79 +462,10 @@ let parseTable (ma:RowParser<'a>) : TablesExtractor<'a> =
             | RErr msg -> Err msg
             | ROk (_,a) -> Ok (ix+1,a)
         with
+        | FatalParseError msg -> raise (FatalParseError msg)    
         | _ -> Err "parseTable" 
 
         
 
 
 
-
-//// *************************************
-//// Search text for "anchors"
-
-//[<Struct>]
-//type SearchAnchor = 
-//    private SearchAnchor of int
-//        member v.Position = match v with | SearchAnchor i -> i
-
-//let private startOfRegion (region:Region) : SearchAnchor = 
-//    SearchAnchor region.RegionStart
-
-//let private endOfRegion (region:Region) : SearchAnchor = 
-//    SearchAnchor region.RegionEnd
-
-//let withSearchAnchor (anchor:SearchAnchor) 
-//                        (ma:TablesExtractor<'a>) : TablesExtractor<'a> = 
-//    TablesExtractor <| fun doc ix  -> 
-//        if anchor.Position > ix then   
-//           apply1 ma doc anchor.Position
-//        else
-//           Err "withSearchAnchor"
-
-//let withSearchAnchorM (anchorQuery:TablesExtractor<SearchAnchor>) 
-//                        (ma:TablesExtractor<'a>) : TablesExtractor<'a> = 
-//    anchorQuery >>>= fun a -> withSearchAnchor a ma
-
-//let advanceM (anchorQuery:TablesExtractor<SearchAnchor>) : TablesExtractor<unit> = 
-//    withSearchAnchorM anchorQuery (dreturn ())
-
-
-//let findText (search:string) (matchCase:bool) : TablesExtractor<Region> =
-//    TablesExtractor <| fun doc ix  -> 
-//        let range =  getRangeToEnd ix doc 
-//        match boundedFind1 search matchCase extractRegion range with
-//        | Some region -> Ok (ix, region)
-//        | None -> Err <| sprintf "findText - '%s' not found" search
-
-//let findTextStart (search:string) (matchCase:bool) : TablesExtractor<SearchAnchor> =
-//    findText search matchCase |>>> startOfRegion
-
-//let findTextEnd (search:string) (matchCase:bool) : TablesExtractor<SearchAnchor> =
-//    findText search matchCase |>>> endOfRegion
-
-///// Case sensitivity always appears to be true for Wildcard matches.
-//let findPattern (search:string) : TablesExtractor<Region> =
-//    TablesExtractor <| fun doc ix  -> 
-//        let range =  getRangeToEnd ix doc 
-//        match boundedFindPattern1 search extractRegion range with
-//        | Some region -> Ok (ix, region)
-//        | None -> Err <| sprintf "findPattern - '%s' not found" search
-        
-//let findPatternStart (search:string)  : TablesExtractor<SearchAnchor> =
-//    findPattern search |>>> startOfRegion
-
-//let findPatternEnd (search:string) : TablesExtractor<SearchAnchor> =
-//    findPattern search |>>> endOfRegion
-
-//let findTextMany (search:string) (matchCase:bool) : TablesExtractor<Region list> =
-//    TablesExtractor <| fun doc ix  -> 
-//        let range =  getRangeToEnd ix doc 
-//        let finds = boundedFindMany search matchCase extractRegion range
-//        Ok (ix,finds)
-
-///// Case sensitivity always appears to be true for Wildcard matches.
-//let findPatternMany (search:string) : TablesExtractor<Region list> =
-//    TablesExtractor <| fun doc ix -> 
-//        let range =  getRangeToEnd ix doc 
-//        let finds = boundedFindPatternMany search extractRegion range
-//        Ok (ix,finds)

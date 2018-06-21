@@ -12,6 +12,11 @@ open Microsoft.Office.Interop
 
 open FParsec
 
+
+exception FatalParseError of string
+
+
+
 let rbox (v : 'a) : obj ref = ref (box v)
 
 

@@ -42,7 +42,8 @@ let rowOf1Matching (patternMatch:string) : RowParser<unit> =
     row (assertCellWordMatch patternMatch &>>>. endOfRow)
 
 let rowOf2 (exactMatch:string) : RowParser<string> = 
-    row (assertCellText exactMatch &>>>. cellText)
+    let errMsg = sprintf "rowOf2 failed - looking for '%s'" exactMatch
+    row (assertCellText exactMatch &>>>. cellText) <&??> errMsg
 
 let rowOf2Matching (patternMatch:string) : RowParser<string> = 
     row (assertCellWordMatch patternMatch &>>>. cellText)
@@ -86,10 +87,11 @@ let extractSurveyInfo : RowParser<SurveyInfo> =
 let extractOutstationInfo : RowParser<OutstationInfo> = 
     parseRows { 
         do! rowOf1 "RTU Outstation"
-        let! name       = rowOf2 "Outstation Name"
+        let! name       = 
+            skipRowsTill <| rowOf2 "RTU Outstation Name"
         let! rtuAddr    = rowOf2 "RTU Address"
         let! otype      = rowOf2 "Outstation Type" 
-        let! snumber    = rowOf2 "Serial Number" 
+        let! snumber    = rowOf2 "Outstation Serial Number" 
         return { 
             OutstationName = name
             RtuAddress = rtuAddr
@@ -100,13 +102,10 @@ let extractOutstationInfo : RowParser<OutstationInfo> =
  
 /// Focus should already be limited to the table in question.
 let extractRelay (relayNumber:int) : RowParser<RelaySetting> = 
-    let funPattern  = sprintf "Relay*%i*Function" relayNumber
-    let onPattern   = sprintf "Relay*%i*On" relayNumber
-    let offPattern  = sprintf "Relay*%i*Off" relayNumber
     parseRows { 
-        let! relayfunction  = rowOf2Matching funPattern
-        let! onSetPt        = rowOf2Matching onPattern
-        let! offSetPt       = rowOf2Matching offPattern
+        let! relayfunction  = skipRowsTill <| rowOf2Matching "Relay*Function"
+        let! onSetPt        = rowOf2Matching "Relay*On*"
+        let! offSetPt       = rowOf2Matching "Relay*Off*"
         return { 
             RelayNumber = relayNumber
             RelayFunction = relayfunction
@@ -128,7 +127,7 @@ let extractUltrasonicMonitorInfo : RowParser<UltrasonicMonitorInfo> =
         let! manuf      = rowOf2 "Manufacturer"
         let! model      = rowOf2 "Model"
         let! snumber    = rowOf2 "Serial Number"
-        let! piTag      = rowOf2 "P & I Tag"
+        let! piTag      = rowOf2Matching "* Tag"
         let! emptyDist  = skipRowsTill <| rowOf2 "Empty Distance"
         let! span       = rowOf2 "Span"
         let! relays     = extractRelays
@@ -150,7 +149,7 @@ let extractUltrasonicSensorInfo : RowParser<UltrasonicSensorInfo> =
         let! manuf      = rowOf2 "Manufacturer"
         let! model      = rowOf2 "Model"
         let! snumber    = rowOf2 "Serial Number"
-        let! location   = rowOf2Matching "Location of Sensor*"
+        let! location   = skipRowsTill <| rowOf2Matching "Location of Sensor*"
         let! gridRef    = rowOf2Matching "Grid Ref*"
         return { 
             SensorManufacturer = manuf
@@ -162,7 +161,7 @@ let extractUltrasonicSensorInfo : RowParser<UltrasonicSensorInfo> =
 
 let extractUltrasonicInfo1 : TablesExtractor<UltrasonicInfo> = 
     parseTables { 
-        let! monitor = parseTable extractUltrasonicMonitorInfo <&?> "ultrasonic failed"
+        let! monitor = parseTable extractUltrasonicMonitorInfo
         let! sensor  = parseTable extractUltrasonicSensorInfo
         return { 
             MonitorInfo = monitor
@@ -172,6 +171,23 @@ let extractUltrasonicInfo1 : TablesExtractor<UltrasonicInfo> =
 /// To ignore
 let tableUltrasonicPhotos : RowParser<unit> = 
     row (assertCellText "Ultrasonic Photos")
+
+
+let extractOverflowChamberInfo : RowParser<OverflowChamberInfo> =  
+    parseRows { 
+        do! rowOf1 "Overflow Chamber"                  
+        let! disName        = rowOf2 "Discharge Name"
+        let! chamberName    = rowOf2Matching "Name of Chamber*"
+        let! gridRef        = rowOf2 "Grid Ref"
+        let! screened       = rowOf2Matching "Is Overflow Screened*"
+        return { 
+            DischargeName = disName
+            ChamberName = chamberName
+            OverflowGridRef = gridRef
+            IsScreened = screened }
+    }
+
+
 
 let extractOverflowType : RowParser<OverflowType> =  
     let proc : RowParser<string * string> = 
@@ -189,30 +205,28 @@ let extractOverflowType : RowParser<OverflowType> =
     
 
 
-let extractOverflowChamberInfo : RowParser<OverflowChamberInfo> =  
-    parseRows { 
-        do! rowOf1 "Overflow Chamber"
-        let! disName        = rowOf2 "Discharge Name"
-        let! chamberName    = rowOf2Matching "Name of Chamber*"
-        let! gridRef        = rowOf2 "Grid Ref"
-        let! screened       = rowOf2Matching "*Overflow Screened"
-        return { 
-            DischargeName = disName
-            ChamberName = chamberName
-            OverflowGridRef = gridRef
-            IsScreened = screened }
-    }
-
 let extractOverflowChamberMetrics : RowParser<OverflowChamberMetrics> =  
     parseRows { 
         do! rowOf1 "Chamber Measurements"
         let! otype      = extractOverflowType
-        let! name       = rowOf2 "Chamber Name"
-        let! roofDist   = rowOf2 "Roof Slab to Invert"
-        let! usDist     = rowOf2 "Transducer Face to Invert"
-        let! ovDist     = rowOf2 "Overflow level to Invert"
-        let! scDist     = rowOf2Matching "Bottom*Screen*Invert"
-        let! emDist     = rowOf2Matching "Emergency*Invert"
+        printfn "___ Chamber Measurements otype=%A" otype
+        do! printIx ()
+        let! name       = fatal "chamber name" <| rowOf2 "Chamber Name"
+        do! printIx ()
+        printfn "___ 0.5"
+        let! roofDist   = rowOf2Matching "*Roof Slab to Invert"
+        printfn "___ 1"
+        let! usDist     = rowOf2Matching "*Transducer Face to Invert"
+        printfn "___ 2"
+        let! scDist     = 
+            rowOf2Matching "*Bottom of Screen to Invert" <|||> rereturn ""
+        printfn "___ 3"    
+        let! ovDist     = rowOf2Matching  "*Overflow level to Invert"
+        printfn "___ 4"
+        let! emDist     = 
+            rowOf2Matching "*Emergency*to Invert" <|||> rereturn ""
+            
+        printfn "___ Chamber Measurements DONE"
         return { 
             OverflowType = otype
             ChamberName = name
@@ -232,9 +246,11 @@ let tableOverflowPhoto : RowParser<unit> =
 let extractOutfallInfo : RowParser<OutfallInfo> = 
     parseRows { 
         do! rowOf1 "Outfall"
+        printfn "___ Outfall"
         let! dname      = rowOf2 "Discharge Name"
-        let! gridRef    = rowOf2 "Grid Ref"
-        let! proven     = rowOf2 "Outfall Proven"
+        let! gridRef    = rowOf2Matching "Grid Ref*"
+        let! proven     = rowOf2Matching "Outfall Proven*"
+        printfn "___ Outfall DONE"
         return { 
             DischargeName = dname
             OutfallGridRef = gridRef
@@ -262,8 +278,8 @@ let extractAppendix : RowParser<string> =
         return ans
     }
 let ultrasonicTable : TablesExtractor<UltrasonicInfo option> = 
-    let info = extractUltrasonicInfo1 |>>> Some
     let photos = parseTable tableUltrasonicPhotos |>>> (fun () -> None)
+    let info = extractUltrasonicInfo1 |>>> Some
     (photos <||> info) <&?> "ultrasonicTable"
 
 

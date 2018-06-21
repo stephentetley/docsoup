@@ -12,6 +12,9 @@ open FParsec
 open DocSoup.Base
 open DocSoup
 
+
+
+
 (* 
 /// This is probably the best we can get without tricks.
 /// Ideally we wouldn't need ``row``, but I can't see how to avoid it.
@@ -59,7 +62,7 @@ let private cellExists (table:Word.Table) (ix:CellIndex) : bool =
         true
     with
     | _ -> false
-
+    
 
 let inline private apply1 (ma: RowExtractor<'nav, 'a>) 
                             (table: Word.Table)
@@ -238,6 +241,7 @@ let runRowExtractor (ma:RowExtractor<'nav,'a>) (table:Word.Table) : RowResult<'a
         let ix = CellIndex.First
         apply1 ma table ix
     with
+    | FatalParseError msg -> raise (FatalParseError msg)
     | _ -> RErr "runRowExtractor"
 
 
@@ -254,6 +258,7 @@ let private cellRange : CellParser<Word.Range> =
             let ix1 = { ix with ColIx = ix.ColIx+1 }
             ROk (ix1, cell.Range)
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "cellRange"
 
 
@@ -275,6 +280,7 @@ let row (ma:CellParser<'a>) : RowParser<'a> =
                 let ix1 = { RowIx = ix.RowIx+1; ColIx = 1 }
                 ROk (ix1, a)
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "row"
 
 let skipCell : CellParser<unit> = 
@@ -306,6 +312,7 @@ let manyCells (ma:CellParser<'a>) : CellParser<'a list> =
                     ROk (ix, List.rev ac) 
             work ix0 []
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "manyCells"
 
 /// This should continue to end of table.
@@ -322,6 +329,7 @@ let manyRows (ma:RowParser<'a>) : RowParser<'a list> =
                     ROk (ix, List.rev ac)
             work ix0 []
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "manyRows"
 
 /// This should tolerate coalesced cells.
@@ -341,6 +349,7 @@ let manyRowsTill (ma:RowParser<'a>)
                     RErr "rowInBounds (end of table)"
             work ix0 []
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "rowInBounds"
 
 
@@ -365,6 +374,7 @@ let manyCellsTill (ma:CellParser<'a>)
                     RErr "manyCellsTill (end of row)"
             work ix0 []
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "manyCellsTill"
 
 let skipRowsTill (ma:RowParser<'a>) : RowParser<'a> = 
@@ -373,6 +383,26 @@ let skipRowsTill (ma:RowParser<'a>) : RowParser<'a> =
 
 let skipCellsTill (ma:CellParser<'a>) : CellParser<'a> = 
     manyCellsTill skipCell (lookahead ma) &>>>. ma
+
+
+// *************************************
+// Debugging 
+
+let printIx () : RowExtractor<'nav,unit> = 
+    RowExtractor <| fun _ ix ->
+        printfn "Index: Row=%i, Col=%i" ix.RowIx ix.ColIx
+        ROk (ix, ())
+
+
+
+let fatal (msg1:string) (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a> =
+    RowExtractor <| fun table ix ->
+        match apply1 ma table ix with
+        | ROk (ix1,a) -> ROk (ix1,a)
+        | RErr msg -> 
+            let text = sprintf "FATAL (%s):\n%s" msg1 msg
+            raise (FatalParseError text)
+
 
 // *************************************
 // Metric info
@@ -388,6 +418,7 @@ let getCellCount : CellParser<int> =
             let rowCells:Word.Cells = table.Rows.Item(ix.RowIx).Cells
             ROk (ix, rowCells.Count)
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "getCellCount"
 
 
@@ -496,6 +527,7 @@ let endOfRow : CellParser<unit> =
             else
                 RErr "endOfRow (not at end)"
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "endOfRow (system failure)"
 
 let endOfTable : RowParser<unit> = 
@@ -508,4 +540,5 @@ let endOfTable : RowParser<unit> =
             else
                 RErr "endOfTable (not at end)"
         with
+        | FatalParseError msg -> raise (FatalParseError msg)
         | _ -> RErr "endOfTable (system failure)"
