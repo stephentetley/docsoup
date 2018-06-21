@@ -148,3 +148,8 @@ let testFParsec01 () =
         printfn "sepBy is proper sep (not endBy)"
         FParsec.CharParsers.run parser "1;2;3;4X" |> printfn "Second attempt: %A"
 
+
+let testFParsec02 () = 
+    let parser = 
+        FParsec.Primitives.many1 digit |>> (fun xs -> new string(List.toArray xs))
+    FParsec.CharParsers.run parser "12345"    

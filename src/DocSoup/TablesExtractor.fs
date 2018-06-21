@@ -446,7 +446,7 @@ let runOnFileE (ma:TablesExtractor<'a>) (fileName:string) : 'a =
 //// *************************************
 //// Run RowExtractor
 
-let parseTable (ma:RowExtractor<'a>) : TablesExtractor<'a> = 
+let parseTable (ma:RowParser<'a>) : TablesExtractor<'a> = 
     TablesExtractor <| fun tables ix ->
         try 
             let table:Word.Table = tables.[ix]

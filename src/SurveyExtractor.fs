@@ -35,40 +35,21 @@ let sw (msg:string) (ma:TablesExtractor<'a>) : TablesExtractor<'a> =
 // *************************************
 // Utility parsers
 
-///// Returns "" if no cell matches the search.
-//let getFieldValue (search:string) (matchCase:bool) : Table1<string> = 
-//    let good = 
-//        withCellM (findCell search matchCase &>>= cellRight) <| getCellText
-//    good <|||> t1return ""
+let rowOf1 (exactMatch:string) : RowParser<unit> = 
+    row (assertCellText exactMatch &>>>. endOfRow)
 
-///// Returns "" if no cell matches the search.
-///// This speeds things up a bit, but for our use case here we are
-///// concerned about layout changes.
-//let getFieldValueByRow (row:int) : Table1<string> = 
-//    let good = 
-//        withCellM (getCellByIndex row 2) <| getCellText
-//    good <|||> t1return ""
+let rowOf1Matching (patternMatch:string) : RowParser<unit> = 
+    row (assertCellMatches patternMatch &>>>. endOfRow)
+
+let rowOf2 (exactMatch:string) : RowParser<string> = 
+    row (assertCellText exactMatch &>>>. cellText)
+
+let rowOf2Matching (patternMatch:string) : RowParser<string> = 
+    row (assertCellMatches patternMatch &>>>. cellText)
 
 
-///// Returns "" if no cell matches the search.
-//let getFieldValuePattern (search:string) : Table1<string> = 
-//    let good = 
-//        withCellM (findCellByPattern search &>>= cellRight) <| getCellText
-//    good <|||> t1return ""
-
-
-//let assertHeaderCell (str:string) : RowExtractor<unit> = 
-//    withCellM (getCellByIndex 1 1) <| assertCellText str
-
-    
-//let assertHeaderCellPattern (pattern:string) : RowExtractor<unit> = 
-//    withCellM (getCellByIndex 1 1) <| assertCellMatches pattern
-
-//let ignoreTable (tableHeader:string) : TablesExtractor<unit> = 
-//    parseTable (assertHeaderCell tableHeader)
-
-//let tableNot (tableHeader:string) : TablesExtractor<unit> = 
-//    parseTable (assertCellTextNot tableHeader)
+let tableNot (tableHeader:string) : TablesExtractor<unit> = 
+    parseTable (row <| assertCellTextNot tableHeader)
 
 
 // *************************************
@@ -76,11 +57,11 @@ let sw (msg:string) (ma:TablesExtractor<'a>) : TablesExtractor<'a> =
 
 let extractSiteDetails : RowParser<SiteInfo> = 
     parseRows { 
-        do! row (assertCellText "Site Details")
-        let! sname          = row (assertCellText "Site Name" &>>>. cellText)
-        let! uid            = row (assertCellText "SAI Number" &>>>. cellText)
-        let! discharge      = row (assertCellText "Discharge Name" &>>>. cellText)
-        let! watercourse    = row (assertCellText "Receiving Watercourse" &>>>. cellText)
+        do! rowOf1 "Site Details"
+        let! sname          = rowOf2 "Site Name"
+        let! uid            = rowOf2 "SAI Number"
+        let! discharge      = skipRowsTill <| rowOf2 "Discharge Name"
+        let! watercourse    = skipRowsTill <| rowOf2 "Receiving Watercourse"
         return {
             SiteName = sname
             SaiNumber = uid
@@ -91,10 +72,10 @@ let extractSiteDetails : RowParser<SiteInfo> =
 
 
 let extractSurveyInfo : RowParser<SurveyInfo> = 
-    table1 { 
-        do! assertHeaderCell "Survey Information"
-        let! name       = getFieldValue "Engineer Name" false
-        let! sdate      = getFieldValue "Date of Survey" false
+    parseRows { 
+        do! rowOf1 "Survey Information"
+        let! name       = skipRowsTill <| rowOf2Matching "*Engineer Name"
+        let! sdate      = rowOf2 "Date of Survey"
         return { 
             EngineerName = name
             SurveyDate = sdate
@@ -102,13 +83,13 @@ let extractSurveyInfo : RowParser<SurveyInfo> =
     }
 
 
-let extractOutstationInfo : Table1<OutstationInfo> = 
-    table1 { 
-        do! assertHeaderCell "RTU Outstation"
-        let! name       = getFieldValue "Outstation Name" false
-        let! rtuAddr    = getFieldValue "RTU Address" false
-        let! otype      = getFieldValue "Outstation Type" false
-        let! snumber    = getFieldValue "Serial Number" false
+let extractOutstationInfo : RowParser<OutstationInfo> = 
+    parseRows { 
+        do! rowOf1 "RTU Outstation"
+        let! name       = rowOf2 "Outstation Name"
+        let! rtuAddr    = rowOf2 "RTU Address"
+        let! otype      = rowOf2 "Outstation Type" 
+        let! snumber    = rowOf2 "Serial Number" 
         return { 
             OutstationName = name
             RtuAddress = rtuAddr
@@ -118,14 +99,14 @@ let extractOutstationInfo : Table1<OutstationInfo> =
 
  
 /// Focus should already be limited to the table in question.
-let extractRelay (relayNumber:int) : Table1<RelaySetting> = 
+let extractRelay (relayNumber:int) : RowParser<RelaySetting> = 
     let funPattern  = sprintf "Relay*%i*Function" relayNumber
     let onPattern   = sprintf "Relay*%i*On" relayNumber
     let offPattern  = sprintf "Relay*%i*Off" relayNumber
-    table1 { 
-        let! relayfunction  = getFieldValuePattern funPattern
-        let! onSetPt        = getFieldValuePattern onPattern
-        let! offSetPt       = getFieldValuePattern offPattern
+    parseRows { 
+        let! relayfunction  = rowOf2Matching funPattern
+        let! onSetPt        = rowOf2Matching onPattern
+        let! offSetPt       = rowOf2Matching offPattern
         return { 
             RelayNumber = relayNumber
             RelayFunction = relayfunction
@@ -135,21 +116,21 @@ let extractRelay (relayNumber:int) : Table1<RelaySetting> =
         }
 
 
-let extractRelays : Table1<RelaySetting list> = 
-    DocSoup.TableExtractor1.mapM extractRelay [1..6] 
+let extractRelays : RowParser<RelaySetting list> = 
+    DocSoup.RowExtractor.mapM extractRelay [1..6] 
         &|>>> List.filter (fun (r:RelaySetting) -> not r.isEmpty)
 
-let extractUltrasonicMonitorInfo : Table1<UltrasonicMonitorInfo> = 
-    table1 {
-        do! assertHeaderCell "Ultrasonic Level Control"
-        let! disName    = getFieldValue "Discharge Being Monitored" false
-        let! procName   = getFieldValueByRow 3
-        let! manuf      = getFieldValue "Manufacturer" false
-        let! model      = getFieldValue "Model" false
-        let! snumber    = getFieldValue "Serial Number" false
-        let! piTag      = getFieldValue "P & I Tag" false
-        let! emptyDist  = getFieldValue "Empty Distance" false
-        let! span       = getFieldValue "Span" false
+let extractUltrasonicMonitorInfo : RowParser<UltrasonicMonitorInfo> = 
+    parseRows {
+        do! rowOf1 "Ultrasonic Level Control"
+        let! disName    = rowOf2 "Discharge Being Monitored"
+        let! procName   = rowOf2Matching "Name of Process*"
+        let! manuf      = rowOf2 "Manufacturer"
+        let! model      = rowOf2 "Model"
+        let! snumber    = rowOf2 "Serial Number"
+        let! piTag      = rowOf2 "P & I Tag"
+        let! emptyDist  = skipRowsTill <| rowOf2 "Empty Distance"
+        let! span       = rowOf2 "Span"
         let! relays     = extractRelays
         return { 
             MonitoredDischarge = disName
@@ -163,14 +144,14 @@ let extractUltrasonicMonitorInfo : Table1<UltrasonicMonitorInfo> =
             Relays = relays }
     }  <&??> "extractUltrasonicMonitorInfo"
 
-let extractUltrasonicSensorInfo : Table1<UltrasonicSensorInfo> = 
-    table1 {
-        do! assertHeaderCell "Ultrasonic Sensor Head"
-        let! manuf      = getFieldValue "Manufacturer" false
-        let! model      = getFieldValue "Model" false
-        let! snumber    = getFieldValue "Serial Number" false
-        let! location   = getFieldValuePattern "Location of Sensor"
-        let! gridRef    = getFieldValuePattern "Grid Ref"
+let extractUltrasonicSensorInfo : RowParser<UltrasonicSensorInfo> = 
+    parseRows {
+        do! rowOf1 "Ultrasonic Sensor Head"
+        let! manuf      = rowOf2 "Manufacturer"
+        let! model      = rowOf2 "Model"
+        let! snumber    = rowOf2 "Serial Number"
+        let! location   = rowOf2Matching "Location of Sensor*"
+        let! gridRef    = rowOf2Matching "Grid Ref*"
         return { 
             SensorManufacturer = manuf
             SensorModel = model
@@ -189,26 +170,32 @@ let extractUltrasonicInfo1 : TablesExtractor<UltrasonicInfo> =
     }
 
 /// To ignore
-let tableUltrasonicPhotos : Table1<unit> = 
-    assertHeaderCell "Ultrasonic Photos" 
+let tableUltrasonicPhotos : RowParser<unit> = 
+    row (assertCellText "Ultrasonic Photos")
 
-let extractOverflowType : Table1<OverflowType> =  
-    table1 { 
-        let! a = TableExtractor1.optional <| findCell "Screen to Invert" false
-        let! b = TableExtractor1.optional <| findCell "Emergency overflow level" false
-        match a,b with
-        | Some _, Some _ -> return SCREENED
-        | _, _ -> return UNSCREENED
-    }
+let extractOverflowType : RowParser<OverflowType> =  
+    let proc : RowParser<string * string> = 
+        parseRows { 
+            let! a = skipRowsTill <| rowOf2Matching "*Screen to Invert"
+            let! b = skipRowsTill <| rowOf2Matching "*Emergency overflow level*"
+            return (a,b)
+        }
+    let answer (ans:option<string * string>) : OverflowType = 
+        match ans with
+        | Some(_,_) -> SCREENED
+        | None -> UNSCREENED
+
+    RowExtractor.lookahead (RowExtractor.optional proc &|>>> answer)
+    
 
 
-let extractOverflowChamberInfo : Table1<OverflowChamberInfo> =  
-    table1 { 
-        do! assertHeaderCell "Overflow Chamber" 
-        let! disName        = getFieldValue "Discharge Name" false
-        let! chamberName    = getFieldValuePattern "Name of Chamber"
-        let! gridRef        = getFieldValue "Grid Ref" false
-        let! screened       = getFieldValuePattern "Overflow Screened"
+let extractOverflowChamberInfo : RowParser<OverflowChamberInfo> =  
+    parseRows { 
+        do! rowOf1 "Overflow Chamber"
+        let! disName        = rowOf2 "Discharge Name"
+        let! chamberName    = rowOf2Matching "Name of Chamber*"
+        let! gridRef        = rowOf2 "Grid Ref"
+        let! screened       = rowOf2Matching "*Overflow Screened"
         return { 
             DischargeName = disName
             ChamberName = chamberName
@@ -216,16 +203,16 @@ let extractOverflowChamberInfo : Table1<OverflowChamberInfo> =
             IsScreened = screened }
     }
 
-let extractOverflowChamberMetrics : Table1<OverflowChamberMetrics> =  
-    table1 { 
-        do! assertHeaderCell "Chamber Measurements"
+let extractOverflowChamberMetrics : RowParser<OverflowChamberMetrics> =  
+    parseRows { 
+        do! rowOf1 "Chamber Measurements"
         let! otype      = extractOverflowType
-        let! name       = getFieldValue "Chamber Name" false
-        let! roofDist   = getFieldValue "Roof Slab to Invert" false
-        let! usDist     = getFieldValue "Transducer Face to Invert" false
-        let! ovDist     = getFieldValue "Overflow level to Invert" false
-        let! scDist     = getFieldValuePattern "Bottom*Screen*Invert"
-        let! emDist     = getFieldValuePattern "Emergency*Invert"
+        let! name       = rowOf2 "Chamber Name"
+        let! roofDist   = rowOf2 "Roof Slab to Invert"
+        let! usDist     = rowOf2 "Transducer Face to Invert"
+        let! ovDist     = rowOf2 "Overflow level to Invert"
+        let! scDist     = rowOf2Matching "Bottom*Screen*Invert"
+        let! emDist     = rowOf2Matching "Emergency*Invert"
         return { 
             OverflowType = otype
             ChamberName = name
@@ -238,16 +225,16 @@ let extractOverflowChamberMetrics : Table1<OverflowChamberMetrics> =
     }
 
 /// To ignore
-let tableOverflowPhoto : Table1<unit> = 
-    assertHeaderCell "Overflow Chamber Photo"
+let tableOverflowPhoto : RowParser<unit> = 
+    row (assertCellText "Overflow Chamber Photo")
     
 
-let extractOutfallInfo : Table1<OutfallInfo> = 
-    table1 { 
-        do! assertHeaderCell "Outfall"
-        let! dname      = getFieldValue "Discharge Name" false
-        let! gridRef    = getFieldValue "Grid Ref" false
-        let! proven     = getFieldValue "Outfall Proven" false
+let extractOutfallInfo : RowParser<OutfallInfo> = 
+    parseRows { 
+        do! rowOf1 "Outfall"
+        let! dname      = rowOf2 "Discharge Name"
+        let! gridRef    = rowOf2 "Grid Ref"
+        let! proven     = rowOf2 "Outfall Proven"
         return { 
             DischargeName = dname
             OutfallGridRef = gridRef
@@ -256,25 +243,24 @@ let extractOutfallInfo : Table1<OutfallInfo> =
     }
 
 /// To ignore
-let tableOutfallPhoto : Table1<unit> = 
-    table1 {
-        do! assertHeaderCell "Outfall Photo"
-        return ()
-    }
+let tableOutfallPhoto : RowParser<unit> = 
+    row (assertCellText "Outfall Photo")
 
-let extractScopeOfWorks : Table1<string> = 
-    table1 {
-        do! assertHeaderCell "Scope of Works"
-        let! ans = withCellM (getCellByIndex 3 1) <| getCellText
+let extractScopeOfWorks : RowParser<string> = 
+    parseRows {
+        do! rowOf1 "Scope of Works"
+        do! skipRow
+        let! ans = row <| cellText
         return ans
     }
 
 /// Single table - Title (1,1) = "Appendix", data in cell (r2,c1):
-let extractAppendix : Table1<string> =  
-    assertHeaderCellPattern "Appendix" &>>>. 
-        (withCellM (getCellByIndex 2 1) <| getCellText)
-
-
+let extractAppendix : RowParser<string> =  
+    parseRows {
+        do! rowOf1Matching "Appendix *"
+        let! ans = row <| cellText
+        return ans
+    }
 let ultrasonicTable : TablesExtractor<UltrasonicInfo option> = 
     let info = extractUltrasonicInfo1 |>>> Some
     let photos = parseTable tableUltrasonicPhotos |>>> (fun () -> None)
@@ -295,7 +281,7 @@ type ChamberTable =
 
 
 
-let chamberTable : Table1<ChamberTable> = 
+let chamberTable : RowParser<ChamberTable> = 
     let info    = extractOverflowChamberInfo &|>>> InfoTable
     let metrics = extractOverflowChamberMetrics &|>>> MetricsTable 
     let photo   = tableOverflowPhoto &|>>> PhotoTable
@@ -315,10 +301,10 @@ let sectionChambers : TablesExtractor<OverflowChamberInfo list * OverflowChamber
     many1 (parseTable chamberTable) |>>> getOverflowLists
 
 
-let outfallTable : Table1<OutfallInfo option> = 
+let outfallTable : RowParser<OutfallInfo option> = 
     let info = extractOutfallInfo &|>>> Some
     let photo = tableOutfallPhoto &|>>> (fun () -> None)
-    swapTableError "outfallTable" (photo <|||> info)
+    swapRowError "outfallTable" (photo <|||> info)
 
 
 /// Note table parser would find finds "OutFall Photos" if we just looked for 

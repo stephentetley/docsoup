@@ -25,10 +25,10 @@ let test01 () =
         manyTill (parseTable RowExtractor.getTableDimensions) eof
     runOnFileE procM testDoc |> printfn "Ans: '%A'"
 
-let table1 : RowExtractor<string * string> = 
+let table1 : RowParser<string * string> = 
     parseRows { 
         let! title  = row (cellText)
-        let! name   = row (skip &>>>. cellText) 
+        let! name   = row (skipCell &>>>. cellText) 
         return title, name
     }
 

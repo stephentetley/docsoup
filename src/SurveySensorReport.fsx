@@ -12,7 +12,7 @@ open Microsoft.Office.Interop
 open System
 
 #load @"DocSoup\Base.fs"
-#load @"DocSoup\TableExtractor1.fs"
+#load @"DocSoup\RowExtractor.fs"
 #load @"DocSoup\TablesExtractor.fs"
 #load @"SurveySyntax.fs"
 #load @"SurveyExtractor.fs"

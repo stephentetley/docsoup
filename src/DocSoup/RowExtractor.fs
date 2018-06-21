@@ -10,6 +10,7 @@ open Microsoft.Office.Interop
 open FParsec
 
 open DocSoup.Base
+open DocSoup
 
 (* 
 /// This is probably the best we can get without tricks.
@@ -43,6 +44,21 @@ type RowExtractor<'nav,'a> =
 
 type RowParser<'a> = RowExtractor<RowPhantom, 'a>
 type CellParser<'a> = RowExtractor<CellPhantom, 'a>
+
+
+/// This is ignorant of coalesced rows.
+let private rowInBounds (table:Word.Table) (ix:CellIndex) : bool = 
+    ix.RowIx >= 1 && ix.RowIx <= table.Rows.Count
+
+let private cellInBounds (table:Word.Table) (ix:CellIndex) : bool = 
+    ix.ColIx >= 1 && ix.ColIx <= table.Columns.Count
+
+let private cellExists (table:Word.Table) (ix:CellIndex) : bool =
+    try 
+        let _ = table.Cell(Row = ix.RowIx, Column = ix.ColIx)
+        true
+    with
+    | _ -> false
 
 
 let inline private apply1 (ma: RowExtractor<'nav, 'a>) 
@@ -201,7 +217,16 @@ let (&>>>.) (ma:RowExtractor<'nav,'a>)
                 (mb:RowExtractor<'nav,'b>) : RowExtractor<'nav,'b> = 
     seqR ma mb
 
-// let manyR (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a list> = 
+/// Test the parser at the current position, if the parser succeeds 
+/// return its answer but don't move forward.
+/// If the parser fails - lookahead fails.
+let lookahead (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a> = 
+    RowExtractor <| fun table ix ->
+        match apply1 ma table ix with
+        | RErr msg -> RErr msg
+        | ROk (_,a) -> ROk (ix,a)
+
+
     
 
 // *************************************
@@ -214,6 +239,23 @@ let runRowExtractor (ma:RowExtractor<'nav,'a>) (table:Word.Table) : RowResult<'a
         apply1 ma table ix
     with
     | _ -> RErr "runRowExtractor"
+
+
+
+// *************************************
+// Get cell text 
+
+let cellText : CellParser<string> = 
+    RowExtractor <| fun table ix -> 
+        try 
+            let cell : Word.Cell = 
+                table.Cell(Row = ix.RowIx, Column = ix.ColIx)
+            let text = cleanRangeText cell.Range
+            let ix1 = { ix with ColIx = ix.ColIx+1 }
+            ROk (ix1, text)
+        with
+        | _ -> RErr "cellText"
+
 
 
 // *************************************
@@ -237,21 +279,95 @@ let skipCell : CellParser<unit> =
 
 let skipRow : RowParser<unit> = 
     RowExtractor <| fun _ ix -> 
-        let ix1 = ix.IncrRow
+        let ix1 = { RowIx = ix.RowIx + 1; ColIx = 1 }
         ROk (ix1, ())
-            
-let cellText : CellParser<string> = 
-    RowExtractor <| fun table ix -> 
-        try 
-            let cell : Word.Cell = 
-                table.Cell(Row = ix.RowIx, Column = ix.ColIx)
-            let text = cleanRangeText cell.Range
-            let ix1 = { ix with ColIx = ix.ColIx+1 }
-            ROk (ix1, text)
+
+
+/// This should continue to end of row.
+/// It should also be imprevious to coalesced cells
+let manyCells (ma:CellParser<'a>) : CellParser<'a list> = 
+    RowExtractor <| fun table ix0 -> 
+        try
+            let rec work ix ac = 
+                if cellInBounds table ix then 
+                    // Consider whether cell is coalesced... 
+                    if cellExists table ix then 
+                        match apply1 ma table ix with
+                        | RErr msg -> ROk (ix, List.rev ac)
+                        | ROk (ix1,a) -> work ix1 (a::ac)
+                    else
+                        work ix.IncrCol ac
+                else
+                    ROk (ix, List.rev ac) 
+            work ix0 []
         with
-        | _ -> RErr "cellText"
+        | _ -> RErr "manyCells"
+
+/// This should continue to end of table.
+let manyRows (ma:RowParser<'a>) : RowParser<'a list> = 
+    RowExtractor <| fun table ix0 -> 
+        try
+            let rec work ix ac = 
+                if rowInBounds table ix then 
+                    match apply1 ma table ix with
+                    | RErr msg -> ROk (ix, List.rev ac)
+                    | ROk (ix1,a) -> 
+                        work ix1 (a::ac)
+                else
+                    ROk (ix, List.rev ac)
+            work ix0 []
+        with
+        | _ -> RErr "manyRows"
+
+/// This should tolerate coalesced cells.
+let manyRowsTill (ma:RowParser<'a>) 
+                    (endP:RowParser<_>) : RowParser<'a list> = 
+    RowExtractor <| fun table ix0 -> 
+        try
+            let rec work ix ac = 
+                if rowInBounds table ix then 
+                    match apply1 endP table ix with
+                    | RErr _ -> 
+                        match apply1 ma table ix with
+                        | RErr msg -> RErr msg
+                        | ROk (ix1,a) -> work ix1 (a::ac)
+                    | ROk (ix1,_) -> ROk (ix1, List.rev ac)
+                else
+                    RErr "rowInBounds (end of table)"
+            work ix0 []
+        with
+        | _ -> RErr "rowInBounds"
 
 
+/// This should tolerate coalesced cells.
+let manyCellsTill (ma:CellParser<'a>) 
+                    (endP:CellParser<_>) : CellParser<'a list> = 
+    RowExtractor <| fun table ix0 -> 
+        try
+            let rec work ix ac = 
+                if cellInBounds table ix then 
+                    // Consider whether cell is coalesced... 
+                    if cellExists table ix then 
+                        match apply1 endP table ix with
+                        | RErr _ -> 
+                            match apply1 ma table ix with
+                            | RErr msg -> RErr msg
+                            | ROk (ix1,a) -> work ix1 (a::ac)
+                        | ROk (ix1,_) -> ROk (ix1, List.rev ac)
+                    else
+                        work ix.IncrCol ac
+                else
+                    RErr "manyCellsTill (end of row)"
+            work ix0 []
+        with
+        | _ -> RErr "manyCellsTill"
+
+let skipRowsTill (ma:RowParser<'a>) : RowParser<'a> = 
+    manyRowsTill skipRow (lookahead ma) &>>>. ma
+
+
+let skipCellsTill (ma:CellParser<'a>) : CellParser<'a> = 
+    manyCellsTill skipCell (lookahead ma) &>>>. ma
 
 // *************************************
 // Metric info
