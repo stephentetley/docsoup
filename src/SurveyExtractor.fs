@@ -209,24 +209,14 @@ let extractOverflowChamberMetrics : RowParser<OverflowChamberMetrics> =
     parseRows { 
         do! rowOf1 "Chamber Measurements"
         let! otype      = extractOverflowType
-        printfn "___ Chamber Measurements otype=%A" otype
-        do! printIx ()
         let! name       = fatal "chamber name" <| rowOf2 "Chamber Name"
-        do! printIx ()
-        printfn "___ 0.5"
         let! roofDist   = rowOf2Matching "*Roof Slab to Invert"
-        printfn "___ 1"
         let! usDist     = rowOf2Matching "*Transducer Face to Invert"
-        printfn "___ 2"
         let! scDist     = 
             rowOf2Matching "*Bottom of Screen to Invert" <|||> rereturn ""
-        printfn "___ 3"    
         let! ovDist     = rowOf2Matching  "*Overflow level to Invert"
-        printfn "___ 4"
         let! emDist     = 
             rowOf2Matching "*Emergency*to Invert" <|||> rereturn ""
-            
-        printfn "___ Chamber Measurements DONE"
         return { 
             OverflowType = otype
             ChamberName = name
@@ -246,11 +236,9 @@ let tableOverflowPhoto : RowParser<unit> =
 let extractOutfallInfo : RowParser<OutfallInfo> = 
     parseRows { 
         do! rowOf1 "Outfall"
-        printfn "___ Outfall"
         let! dname      = rowOf2 "Discharge Name"
         let! gridRef    = rowOf2Matching "Grid Ref*"
         let! proven     = rowOf2Matching "Outfall Proven*"
-        printfn "___ Outfall DONE"
         return { 
             DischargeName = dname
             OutfallGridRef = gridRef
