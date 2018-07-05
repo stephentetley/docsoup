@@ -5,6 +5,9 @@
 module SurveySyntax
 
 
+open System.Xml
+open System.Xml.Linq
+
 
 // Favour strings for data (even for dates, etc.).
 // Our word surveys are very "free texty" and there is no guarantee the 
@@ -138,4 +141,28 @@ type Survey =
       OutfallInfos: OutfallInfo list
       ScopeOfWorks: string 
       AppendixText: string }
+
+///type SiteInfo = 
+    //{ SiteName: string
+    //  SaiNumber: string
+    //  DischargeName: string 
+    //  ReceivingWatercourse: string } 
+
+let private xname (s:string) = XName.Get s
+
+
+let private siteInfoToXml (info:SiteInfo) : XElement = 
+    let elt = XElement(XName.Get "SiteInfo")
+    elt.Add([   XElement(xname "SiteName", info.SiteName);
+                XElement(xname "SaiNumber", info.SaiNumber);
+                XElement(xname "DischargeName", info.DischargeName);
+                XElement(xname "ReceivingWatercourse", info.ReceivingWatercourse) ])
+    elt
+
+let surveyToXml (survey:Survey) : XDocument  = 
+    let doc = XDocument ()
+    doc.Add(siteInfoToXml survey.SiteDetails)
+    doc
+
+
 

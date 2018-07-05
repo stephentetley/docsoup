@@ -80,6 +80,15 @@
       <Isolated>False</Isolated>
       <WrapperTool>primary</WrapperTool>
     </COMReference>
+    <COMReference Include="Microsoft XML, v6.0">
+      <Guid>{f5078f18-c551-11d3-89b9-0000f81fe221}</Guid>
+      <VersionMajor>6</VersionMajor>
+      <VersionMinor>0</VersionMinor>
+      <Lcid>0</Lcid>
+      <Isolated>False</Isolated>
+      <WrapperTool>tlbimp</WrapperTool>
+      <Private>True</Private>
+    </COMReference>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FParsec">
@@ -99,6 +108,8 @@
       <HintPath>..\packages\System.ValueTuple.4.4.0\lib\net461\System.ValueTuple.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
