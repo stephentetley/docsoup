@@ -194,6 +194,14 @@ let optional (ma:RowExtractor<'nav,'a>) : RowExtractor<'nav,'a option> =
         | RErr _ -> ROk (ix, None)
         | ROk (ix1,a) -> ROk (ix1, Some a)
 
+
+/// Optionally parses. When the parser fails return None and don't move the cursor position.
+let optionalDefault (ma:RowExtractor<'nav,'a>) (defaultValue:'a) : RowExtractor<'nav,'a> = 
+    RowExtractor <| fun table ix ->
+        match apply1 ma table ix with
+        | RErr _ -> ROk (ix, defaultValue)
+        | ROk (ix1,a) -> ROk (ix1, a)
+
 /// Perform two actions in sequence. Ignore the results of the second action if both succeed.
 let seqL (ma:RowExtractor<'nav,'a>) 
             (mb:RowExtractor<'nav,'b>) : RowExtractor<'nav,'a> = 

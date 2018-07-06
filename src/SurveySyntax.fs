@@ -7,6 +7,7 @@ module SurveySyntax
 
 open System.Xml
 open System.Xml.Linq
+open System
 
 
 // Favour strings for data (even for dates, etc.).
@@ -111,6 +112,7 @@ type OverflowChamberMetrics =
       ChamberName: string 
       RoofToInvert: string
       UsFaceToInvert: string
+      CoverLevelToInvert: string
       OverflowToInvert: string
       ScreenToInvert: string
       EmergencyOverflowToInvert: string
@@ -119,6 +121,7 @@ type OverflowChamberMetrics =
         v.ChamberName = "" 
             && v.RoofToInvert = "" 
             && v.UsFaceToInvert = ""
+            && v.CoverLevelToInvert = ""
             && v.OverflowToInvert = ""
             && v.ScreenToInvert = ""
             && v.EmergencyOverflowToInvert = ""
@@ -142,26 +145,119 @@ type Survey =
       ScopeOfWorks: string 
       AppendixText: string }
 
-///type SiteInfo = 
-    //{ SiteName: string
-    //  SaiNumber: string
-    //  DischargeName: string 
-    //  ReceivingWatercourse: string } 
 
-let private xname (s:string) = XName.Get s
+
+let private xname (s:string) : XName = XName.Get s
+let private xelement (s:string) :XElement = XElement(xname s)
+let private xattribute (s:string) (v:obj) :XAttribute = XAttribute(xname s, v)
 
 
 let private siteInfoToXml (info:SiteInfo) : XElement = 
-    let elt = XElement(XName.Get "SiteInfo")
+    let elt = XElement(xname "SiteInfo")
     elt.Add([   XElement(xname "SiteName", info.SiteName);
                 XElement(xname "SaiNumber", info.SaiNumber);
                 XElement(xname "DischargeName", info.DischargeName);
                 XElement(xname "ReceivingWatercourse", info.ReceivingWatercourse) ])
     elt
 
+let private surveyInfoToXml (info:SurveyInfo) : XElement = 
+    let elt = XElement(xname "SurveyInfo")
+    elt.Add([   XElement(xname "EngineerName", info.EngineerName);
+                XElement(xname "SurveyDate", info.SurveyDate) ])
+    elt
+
+let private outstationInfoToXml (info:OutstationInfo) : XElement = 
+    let elt = XElement(xname "OutstationInfo")
+    elt.Add([   XElement(xname "OutstationName", info.OutstationName);
+                XElement(xname "RtuAddress", info.RtuAddress);
+                XElement(xname "OutstationType", info.OutstationType);
+                XElement(xname "SerialNumber", info.SerialNumber) ])
+    elt
+
+
+/// RelaySetting
+let private relaySettingInfoToXml (info:RelaySetting) : XElement = 
+    let elt = XElement(xname "RelaySetting")
+    elt.Add (xattribute "Number" info.RelayNumber)
+    elt.Add([   XElement(xname "RelayFunction", info.RelayFunction);
+                XElement(xname "OnSetPoint", info.OnSetPoint);
+                XElement(xname "OffSetPoint", info.OffSetPoint) ])
+    elt
+
+let private ultrasonicMonitorInfoToXml (info:UltrasonicMonitorInfo) : XElement = 
+    let elt = XElement(xname "UltrasonicMonitor")
+    elt.Add([   XElement(xname "ProcessOrFacilityName", info.ProcessOrFacilityName);
+                XElement(xname "Manufacturer", info.MonitorManufacturer);
+                XElement(xname "Model", info.MonitorModel);
+                XElement(xname "SerialNumber", info.SerialNumber) ])
+    elt.Add(List.map relaySettingInfoToXml info.Relays)
+    elt
+
+let private ultrasonicSensorInfoToXml (info:UltrasonicSensorInfo) : XElement = 
+    let elt = XElement(xname "UltrasonicSensor")
+    elt.Add([   XElement(xname "Manufacturer", info.SensorManufacturer)
+                XElement(xname "Model", info.SensorModel);
+                XElement(xname "SerialNumber", info.SerialNumber);
+                XElement(xname "LocationOfSensor", info.LocationOfSensor);
+                XElement(xname "GridRef", info.GridRef)  ])
+    elt
+    
+let private ultrasonicInfoToXml (info:UltrasonicInfo) : XElement = 
+    let elt = XElement(xname "UltrasonicInfo")
+    elt.Add([   ultrasonicMonitorInfoToXml info.MonitorInfo;
+                ultrasonicSensorInfoToXml info.SensorInfo ])
+    elt    
+
+let private overflowChamberInfoToXml (info:OverflowChamberInfo) : XElement = 
+    let elt = XElement(xname "OverflowChamber")
+    elt.Add([   XElement(xname "DischargeName", info.DischargeName);
+                XElement(xname "ChamberName", info.ChamberName);
+                XElement(xname "OverflowGridRef", info.OverflowGridRef);
+                XElement(xname "IsScreened", info.IsScreened)  ])
+    elt    
+
+let private overflowChamberMetricsToXml (info:OverflowChamberMetrics) : XElement = 
+    let elt = XElement(xname "OverflowMetrics")
+    elt.Add([   XElement(xname "ChamberName", info.ChamberName);
+                XElement(xname "OverflowType", info.OverflowType.ToString());
+                XElement(xname "RoofToInvert", info.RoofToInvert);
+                XElement(xname "UsFaceToInvert", info.UsFaceToInvert);
+                XElement(xname "CoverLevelToInvert", info.CoverLevelToInvert); 
+                XElement(xname "ScreenToInvert", info.ScreenToInvert);
+                XElement(xname "OverflowToInvert", info.OverflowToInvert);
+                XElement(xname "EmergencyOverflowToInvert", info.EmergencyOverflowToInvert) ])
+    elt    
+
+let private outfallInfoToXml (info:OutfallInfo) : XElement = 
+    let elt = XElement(xname "Outfall")
+    elt.Add([   XElement(xname "DischargeName", info.DischargeName);
+                XElement(xname "OutfallGridRef", info.OutfallGridRef);
+                XElement(xname "OutfallProven", info.OutfallProven) ])
+    elt    
+
+let private scopeOfWorksToXml (body:string) : XElement = 
+    XElement(xname "ScopeOfWorks", body)
+   
+let private appendixToXml (body:string) : XElement = 
+    XElement(xname "Appendix", body)
+
+
+
 let surveyToXml (survey:Survey) : XDocument  = 
     let doc = XDocument ()
-    doc.Add(siteInfoToXml survey.SiteDetails)
+    let root = xelement "EdmSurvey"
+    root.Add (xattribute "ProcessingTimeStamp" (DateTime.Now.ToString("dd/MM/yyyy hh:mm:ss")))
+    doc.Add(root)
+    
+    root.Add([  siteInfoToXml survey.SiteDetails; 
+                surveyInfoToXml survey.SurveyInfo;
+                outstationInfoToXml survey.OutstationInfo ])
+    root.Add(List.map ultrasonicInfoToXml survey.UltrasonicInfos)
+    root.Add(List.map overflowChamberInfoToXml survey.ChamberInfos)
+    root.Add(List.map overflowChamberMetricsToXml survey.ChamberMetrics)
+    root.Add(List.map outfallInfoToXml survey.OutfallInfos)
+    root.Add([  scopeOfWorksToXml survey.ScopeOfWorks; 
+                appendixToXml survey.AppendixText ])
     doc
 
 

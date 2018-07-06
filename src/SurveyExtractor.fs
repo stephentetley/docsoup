@@ -212,6 +212,7 @@ let extractOverflowChamberMetrics : RowParser<OverflowChamberMetrics> =
         let! name       = fatal "chamber name" <| rowOf2 "Chamber Name"
         let! roofDist   = rowOf2Matching "*Roof Slab to Invert"
         let! usDist     = rowOf2Matching "*Transducer Face to Invert"
+        let! coverDist  = optionalDefault (rowOf2Matching "*Cover Level to Invert") ""
         let! scDist     = 
             rowOf2Matching "*Bottom of Screen to Invert" <|||> rereturn ""
         let! ovDist     = rowOf2Matching  "*Overflow level to Invert"
@@ -222,6 +223,7 @@ let extractOverflowChamberMetrics : RowParser<OverflowChamberMetrics> =
             ChamberName = name
             RoofToInvert = roofDist
             UsFaceToInvert = usDist 
+            CoverLevelToInvert = coverDist
             OverflowToInvert = ovDist
             ScreenToInvert = scDist
             EmergencyOverflowToInvert = emDist 
