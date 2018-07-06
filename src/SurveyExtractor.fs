@@ -298,8 +298,10 @@ let private getOverflowLists (source: ChamberTable list)
     let rec work ac bc xs = 
         match xs with
         | [] -> (List.rev ac, List.rev bc)
-        | InfoTable a :: rest -> work (a::ac) bc rest
-        | MetricsTable b :: rest -> work ac (b::bc) rest
+        | InfoTable a :: rest -> 
+            if not a.isEmpty then work (a::ac) bc rest else work ac bc rest
+        | MetricsTable b :: rest -> 
+            if not b.isEmpty then work ac (b::bc) rest else work ac bc rest
         | PhotoTable _ :: rest -> work ac bc rest
     work [] [] source
             

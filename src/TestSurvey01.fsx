@@ -23,11 +23,18 @@ open DocSoup.TablesExtractor
 #load @"SurveyExtractor.fs"
 open SurveySyntax
 open SurveyExtractor
+open System.Xml.Linq
 
+
+let outputSurveyAsXml (outPath:string) (survey:Survey) : unit = 
+    let xml:XDocument = surveyToXml survey
+    xml.Save(outPath)
 
 let processSurvey (docPath:string) : unit = 
     printfn "Doc: %s" docPath
-    runOnFileE parseSurvey docPath |> (fun a -> printfn "%A" (surveyToXml a))
+    let outfile = System.IO.Path.ChangeExtension(docPath, "ess")
+    runOnFileE parseSurvey docPath 
+        |> outputSurveyAsXml outfile
 
 
 let processSite(folderPath:string) : unit  =
