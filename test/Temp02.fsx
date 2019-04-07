@@ -4,14 +4,14 @@
 #r "office"
 open Microsoft.Office.Interop
 
-#I @"..\packages\FParsec.1.0.3\lib\portable-net45+win8+wp8+wpa81"
+#I @"C:\Users\stephen\.nuget\packages\FParsec\1.0.4-rc3\lib\netstandard1.6"
 #r "FParsec"
 #r "FParsecCS"
 open FParsec
 
-#load @"DocSoup\Base.fs"
-#load @"DocSoup\RowExtractor.fs"
-#load @"DocSoup\DocExtractor.fs"
+#load @"..\src\DocSoup\Base.fs"
+#load @"..\src\DocSoup\RowExtractor.fs"
+#load @"..\src\DocSoup\DocExtractor.fs"
 open DocSoup.Base
 open DocSoup.RowExtractor
 open DocSoup.DocExtractor

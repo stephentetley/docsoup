@@ -5,7 +5,7 @@ open Microsoft.Office.Interop
 #r "System.Xml"
 #r "System.Xml.Linq"
 
-#I @"..\packages\FParsec.1.0.3\lib\portable-net45+win8+wp8+wpa81"
+#I @"C:\Users\stephen\.nuget\packages\FParsec\1.0.4-rc3\lib\netstandard1.6"
 #r "FParsec"
 #r "FParsecCS"
 
@@ -13,9 +13,9 @@ open FParsec
 open System.IO
 
 
-#load @"DocSoup\Base.fs"
-#load @"DocSoup\RowExtractor.fs"
-#load @"DocSoup\TablesExtractor.fs"
+#load @"..\src\DocSoup\Base.fs"
+#load @"..\src\DocSoup\RowExtractor.fs"
+#load @"..\src\DocSoup\TablesExtractor.fs"
 open DocSoup.RowExtractor
 open DocSoup.TablesExtractor
 
@@ -23,18 +23,11 @@ open DocSoup.TablesExtractor
 #load @"SurveyExtractor.fs"
 open SurveySyntax
 open SurveyExtractor
-open System.Xml.Linq
 
-
-let outputSurveyAsXml (outPath:string) (survey:Survey) : unit = 
-    let xml:XDocument = surveyToXml survey
-    xml.Save(outPath)
 
 let processSurvey (docPath:string) : unit = 
     printfn "Doc: %s" docPath
-    let outfile = System.IO.Path.ChangeExtension(docPath, "ess")
-    runOnFileE parseSurvey docPath 
-        |> outputSurveyAsXml outfile
+    runOnFileE parseSurvey docPath |> (fun a -> printfn "%A" (surveyToXml a))
 
 
 let processSite(folderPath:string) : unit  =

@@ -1,19 +1,22 @@
 ﻿// Copyright (c) Stephen Tetley 2018
 // License: BSD 3 Clause
 
+#r "netstandard"
+#r "System.Xml.Linq"
+
 #I @"C:\WINDOWS\assembly\GAC_MSIL\Microsoft.Office.Interop.Word\15.0.0.0__71e9bce111e9429c"
 #r "Microsoft.Office.Interop.Word"
 open Microsoft.Office.Interop
 
-#I @"..\packages\FParsec.1.0.3\lib\portable-net45+win8+wp8+wpa81"
+#I @"C:\Users\stephen\.nuget\packages\FParsec\1.0.4-rc3\lib\netstandard1.6"
 #r "FParsec"
 #r "FParsecCS"
 
 open System
 
-#load @"DocSoup\Base.fs"
-#load @"DocSoup\RowExtractor.fs"
-#load @"DocSoup\TablesExtractor.fs"
+#load @"..\src\DocSoup\Base.fs"
+#load @"..\src\DocSoup\RowExtractor.fs"
+#load @"..\src\DocSoup\TablesExtractor.fs"
 #load @"SurveySyntax.fs"
 #load @"SurveyExtractor.fs"
 open DocSoup.TablesExtractor

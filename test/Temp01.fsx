@@ -4,12 +4,12 @@
 #r "office"
 open Microsoft.Office.Interop
 
-#I @"..\packages\FParsec.1.0.3\lib\portable-net45+win8+wp8+wpa81"
+#I @"C:\Users\stephen\.nuget\packages\FParsec\1.0.4-rc3\lib\netstandard1.6"
 #r "FParsec"
 #r "FParsecCS"
 open FParsec
 
-#load @"DocSoup\Base.fs"
+#load @"..\src\DocSoup\Base.fs"
 open DocSoup.Base
 
 
