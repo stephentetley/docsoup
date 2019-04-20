@@ -9,8 +9,8 @@ open Microsoft.Office.Interop
 #r "FParsecCS"
 open FParsec
 
-#load @"..\src\DocSoup\Base.fs"
-open DocSoup.Base
+#load @"..\src\DocSoup\Internal\Common.fs"
+open DocSoup.Internal.Common
 
 
 let testDoc = @"G:\work\working\Survey1.docx"

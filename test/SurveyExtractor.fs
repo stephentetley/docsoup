@@ -4,7 +4,7 @@
 
 module SurveyExtractor
 
-open DocSoup.Base
+open DocSoup.Internal.Common
 open DocSoup.RowExtractor
 open DocSoup.TablesExtractor
 open DocSoup

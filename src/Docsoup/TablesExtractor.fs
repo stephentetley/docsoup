@@ -7,7 +7,7 @@ open System.Text.RegularExpressions
 open Microsoft.Office.Interop
 open FParsec
 
-open DocSoup.Base
+open DocSoup.Internal.Common
 open DocSoup.RowExtractor
 
             

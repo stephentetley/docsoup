@@ -14,4 +14,8 @@
     <None Include="Temp03.fsx" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\src\Docsoup.fsproj" />
+  </ItemGroup>
+
 </Project>

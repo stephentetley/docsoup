@@ -14,7 +14,7 @@ open Microsoft.Office.Interop
 
 open System
 
-#load @"..\src\DocSoup\Base.fs"
+#load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\RowExtractor.fs"
 #load @"..\src\DocSoup\TablesExtractor.fs"
 #load @"SurveySyntax.fs"
