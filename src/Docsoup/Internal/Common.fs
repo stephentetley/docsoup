@@ -1,4 +1,4 @@
-﻿// Copyright (c) Stephen Tetley 2018
+﻿// Copyright (c) Stephen Tetley 2018,2019
 // License: BSD 3 Clause
 
 namespace DocSoup.Internal
@@ -12,8 +12,6 @@ module Common =
     // All the PIA stuff online is outdated for Office 365 / .Net 4.5 / VS2015 
     open Microsoft.Office.Interop
 
-    open FParsec
-
 
     exception FatalParseError of string
 
@@ -21,6 +19,8 @@ module Common =
 
     let rbox (v : 'a) : obj ref = ref (box v)
 
+
+    let rangeText (range:Word.Range) : string = range.Text
 
     let cleanRangeText (range:Word.Range) : string = 
         let str = Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
@@ -219,10 +219,4 @@ module Common =
         List.unfold producer initialRange
 
 
-    type ParsecParser<'ans> = Parser<'ans,unit>
-
-
-    type FParsecFallback<'a> = 
-        | FParsecOk of 'a
-        | FallbackText of string
 

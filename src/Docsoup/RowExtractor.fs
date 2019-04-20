@@ -10,7 +10,7 @@ open Microsoft.Office.Interop
 open FParsec
 
 open DocSoup.Internal.Common
-open DocSoup
+open DocSoup.Internal.Old
 
 
 

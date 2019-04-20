@@ -10,6 +10,7 @@ open Microsoft.Office.Interop
 open FParsec
 
 #load @"..\src\DocSoup\Internal\Common.fs"
+#load @"..\src\DocSoup\Internal\Old.fs"
 #load @"..\src\DocSoup\RowExtractor.fs"
 #load @"..\src\DocSoup\DocExtractor.fs"
 open DocSoup.Internal.Common
