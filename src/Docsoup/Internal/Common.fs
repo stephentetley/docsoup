@@ -13,11 +13,30 @@ module Common =
     open Microsoft.Office.Interop
 
 
-    exception FatalParseError of string
-
-
-
+    
+    
     let rbox (v : 'a) : obj ref = ref (box v)
+
+    let primitiveExtract (extract:Word.Document -> 'a) (fileName:string) : Result<'a,string> =
+        if System.IO.File.Exists (fileName) then
+            let app = new Word.ApplicationClass (Visible = false) :> Word.Application
+            try 
+                let doc = app.Documents.Open(FileName = rbox fileName)
+                let ans = extract doc
+                doc.Close(SaveChanges = rbox false)
+                app.Quit()
+                Ok ans
+            with
+              | ex -> 
+                let msg = sprintf "exn type: %A\nmessage: %s" (ex.GetType())  ex.Message
+                try 
+                    app.Quit ()
+                    Error msg
+                with
+                | _ -> Error msg
+        else 
+            Error <| sprintf "Cannot find file: %s" fileName
+
 
 
     let rangeText (range:Word.Range) : string = range.Text
@@ -25,6 +44,37 @@ module Common =
     let cleanRangeText (range:Word.Range) : string = 
         let str = Regex.Replace(range.Text, @"[\p{C}-[\r\n]]+", "")
         str.Trim() 
+
+
+    let find1 (search:string) (matchCase:bool) (range:Word.Range) : Word.Range option = 
+        range.Find.ClearFormatting ()
+        let found = 
+            range.Find.Execute (FindText = rbox search, 
+                                MatchWildcards = rbox false,
+                                MatchCase = rbox matchCase,
+                                Forward = rbox true) 
+        if found then Some range else None
+
+
+    let findMany (search:string) (matchCase:bool) (range:Word.Range) : Word.Range list = 
+        let rec work (current:Word.Range) (cont: Word.Range list -> Word.Range list) = 
+        
+            printfn "Initial Range { start: %i; end %i} " range.Start range.End
+            let found = 
+                current.Find.Execute (FindText = rbox search, 
+                                    MatchWildcards = rbox false,
+                                    MatchCase = rbox matchCase,
+                                    Forward = rbox true) 
+            if found then 
+                let ans = current
+                work current ( fun xs -> cont (current :: xs))
+            else 
+                cont []
+
+
+        range.Find.ClearFormatting ()
+        work range (fun xs -> xs)
+
 
     // StringReader appears to be the best way of doing this. 
     // Trying to split on a character (or character combo e.g. "\r\n") seems unreliable.

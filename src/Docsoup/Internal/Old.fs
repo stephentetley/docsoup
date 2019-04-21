@@ -7,6 +7,7 @@ module Old =
 
     open FParsec
 
+    exception FatalParseError of string
 
     type ParsecParser<'ans> = Parser<'ans,unit>
 
