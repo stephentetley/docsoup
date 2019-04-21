@@ -8,6 +8,7 @@
     <Compile Include="DocSoup\Internal\Common.fs" />
     <Compile Include="DocSoup\Internal\Region.fs" />
     <Compile Include="DocSoup\Internal\Old.fs" />
+    <Compile Include="DocSoup\Internal\OpenXml.fs" />
     <Compile Include="DocSoup\RowExtractor.fs" />
     <Compile Include="DocSoup\TablesExtractor.fs" />
     <Compile Include="DocSoup\DocExtractor.fs" />
