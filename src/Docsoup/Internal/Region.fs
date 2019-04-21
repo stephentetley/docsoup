@@ -38,21 +38,36 @@ module Region =
         r1.Start <= r2.Start && r1.End >= r2.End
 
 
+    type FindOptions = 
+        { MatchCase : bool 
+          MatchWholeWord : bool
+          MatchWildcards : bool
+          MatchSoundsLike : bool 
+          MatchAllWordForms : bool
+        }
+
     /// Word's find is horrible to use because uses mutation.
-    let find1 (search:string) (matchCase:bool) (range:Word.Range) : Region option = 
+    /// It is okay for find1 but horrible for findmany, we prefer to use
+    /// Regions.
+    let find1 (needle:string) (options:FindOptions) (range:Word.Range) : Region option = 
         range.Find.ClearFormatting ()
         let found = 
-            range.Find.Execute (FindText = rbox search, 
-                                MatchWildcards = rbox false,
-                                MatchCase = rbox matchCase,
+            range.Find.Execute (FindText = rbox needle, 
+                                MatchCase = rbox options.MatchCase,
+                                MatchWholeWord = rbox options.MatchWholeWord,
+                                MatchWildcards = rbox options.MatchWildcards,
+                                MatchSoundsLike = rbox options.MatchSoundsLike,
+                                MatchAllWordForms = rbox options.MatchAllWordForms,
+                                // Format = rbox 
+                                Wrap = rbox false,
                                 Forward = rbox true) 
         if found then Some (ofRange range) else None
 
-    /// Word's find is horrible to use because uses mutation.
-    let findMany (search:string) (matchCase:bool) (range:Word.Range) : Region list = 
+    /// Word's Find is horrible to use because uses mutation, so we find Regions not Ranges.
+    let findMany (needle:string) (matchCase:bool) (range:Word.Range) : Region list = 
         let rec work (current:Word.Range) (cont: Region list -> Region list) = 
             let found = 
-                current.Find.Execute (FindText = rbox search, 
+                current.Find.Execute (FindText = rbox needle, 
                                     MatchWildcards = rbox false,
                                     MatchCase = rbox matchCase,
                                     Forward = rbox true) 
@@ -65,7 +80,8 @@ module Region =
         range.Find.ClearFormatting ()
         work range (fun xs -> xs)
 
-        
+
+            
 
 
     ///// Find the (improper) union of two regions.
