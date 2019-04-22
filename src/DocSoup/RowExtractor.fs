@@ -16,5 +16,16 @@ module RowExtractor =
 
     type RowExtractor<'a> = ExtractMonad<Wordprocessing.TableRow,'a> 
 
+    
+    let cells : RowExtractor<seq<Wordprocessing.TableCell>> = 
+        asks (fun row -> row.Elements<Wordprocessing.TableCell>())
+
+    let cell (index:int) : RowExtractor<Wordprocessing.TableCell> = 
+        rowExtractor { 
+            let! xs = cells
+            return! liftOption (Seq.tryItem index xs)
+        }
+
+
     let rowInnerText : RowExtractor<string> = 
         asks (fun row -> row.InnerText)

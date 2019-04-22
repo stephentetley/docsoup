@@ -22,6 +22,7 @@ open DocumentFormat.OpenXml.Wordprocessing
 #load @"..\src\DocSoup\BodyExtractor.fs"
 #load @"..\src\DocSoup\TableExtractor.fs"
 #load @"..\src\DocSoup\RowExtractor.fs"
+#load @"..\src\DocSoup\CellExtractor.fs"
 open DocSoup
 
 
@@ -46,3 +47,11 @@ let demo03b () : Answer<int> =
 
 let demo04 () : Answer<string> = 
     runDocumentExtractor testDoc (body &>> table 0 &>> row 0 &>> rowInnerText)
+
+
+let demo05a () : Answer<string> = 
+    runDocumentExtractor testDoc (body &>> table 0 &>> row 14 &>> cell 0 &>> cellParagraphsText)
+
+let demo05b () : Answer<string> = 
+    runDocumentExtractor testDoc (body &>> table 0 &>> tableCell 14 0 &>> cellParagraphsText)
+

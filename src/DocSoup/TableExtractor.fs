@@ -26,5 +26,11 @@ module TableExtractor =
             return! liftOption (Seq.tryItem index xs)
         }
 
+    let tableCell (rowIndex:int) (columnIndex:int) : TableExtractor<Wordprocessing.TableCell> = 
+        tableExtractor { 
+            let! xs = row rowIndex |>> fun r1 -> r1.Elements<Wordprocessing.TableCell>()
+            return! liftOption (Seq.tryItem columnIndex xs)
+        }
+
     let tableInnerText : TableExtractor<string> = 
         asks (fun table -> table.InnerText)
