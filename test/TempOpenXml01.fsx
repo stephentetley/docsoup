@@ -20,6 +20,7 @@ open System.Linq
 open DocumentFormat.OpenXml.Packaging
 open DocumentFormat.OpenXml.Wordprocessing
 
+#load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 open DocSoup.Internal
 
@@ -63,9 +64,16 @@ let demo04 () =
         body |> OpenXml.bodyParagraphs   |> Seq.iter (fun (para:Paragraph) -> printfn "%s" para.InnerText)
         body |> OpenXml.bodyTables       |> Seq.iter (fun (table:Table) -> printfn "%s" table.InnerText)
 
-let tablePrint (table:Table) : unit = 
-    let rows : TableRow seq = table.Elements<TableRow>()
-    rows |> Seq.iter (fun row -> printfn "%s" row.InnerText)
+
+let cellText (cell:TableCell) : string = 
+    cell.Elements<Paragraph>() |> Seq.map (fun text -> text.InnerText)  |> Common.fromLines
+    
+
+let printTable (table:Table) : unit = 
+    let rows : TableRow seq = table |> OpenXml.tableRows 
+    let printRow (row:TableRow) : unit = 
+        row |> OpenXml.tableRowCells |> Seq.map cellText |> String.concat "|" |> printfn "%s"
+    rows |> Seq.iter printRow
         
 let demo05 () = 
     let docPath = localFile "temp-not-for-github.docx"
@@ -73,6 +81,6 @@ let demo05 () =
         let body : Body = wordDoc.MainDocumentPart.Document.Body
         match OpenXml.tryFindTable "Site Details" body with
         | None -> printfn "not found"
-        | Some (table:Table) -> tablePrint table
+        | Some (table:Table) -> printTable table
 
 
