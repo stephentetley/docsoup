@@ -3,7 +3,7 @@
 
 namespace DocSoup
 
-
+[<AutoOpen>]
 module RowExtractor = 
     
     open DocumentFormat.OpenXml

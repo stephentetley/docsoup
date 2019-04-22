@@ -20,6 +20,8 @@ open DocumentFormat.OpenXml.Wordprocessing
 #load @"..\src\DocSoup\ExtractMonad.fs"
 #load @"..\src\DocSoup\DocumentExtractor.fs"
 #load @"..\src\DocSoup\BodyExtractor.fs"
+#load @"..\src\DocSoup\TableExtractor.fs"
+#load @"..\src\DocSoup\RowExtractor.fs"
 open DocSoup
 
 
@@ -27,3 +29,20 @@ let testDoc = @"E:\coding\fsharp\docsoup\data\temp-not-for-github.docx"
 
 let demo01 () = 
     runDocumentExtractor testDoc documentInnerText
+
+
+
+let demo02 () = 
+    runDocumentExtractor testDoc (body &>> bodyInnerText)
+
+
+let demo03a () : Answer<int> = 
+    runDocumentExtractor testDoc (body &>> paragraphs &>> asks Seq.length)
+
+let demo03b () : Answer<int> = 
+    runDocumentExtractor testDoc (body &>> tables &>> asks Seq.length)
+
+
+
+let demo04 () : Answer<string> = 
+    runDocumentExtractor testDoc (body &>> table 0 &>> row 0 &>> rowInnerText)

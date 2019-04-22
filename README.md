@@ -1,11 +1,8 @@
 # docsoup
 
-Extraction parser combinators for Word docs. 
+Extraction combinators for Word docs. 
 
-This is not a Word parser per se - it uses Com automation 
-rather than directly reading files; it is inspired by island 
-parsing and intends to extract fragments rather than a whole 
-syntax tree. However it can be used to write useful data 
-extractors, especially for documents with information in regular 
-tables.
+This is not a Word parser per se - it uses the Office OpenXml SDK 
+to get a view of the document rather than directly reading files.
+
 

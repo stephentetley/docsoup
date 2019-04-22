@@ -26,6 +26,12 @@ module BodyExtractor =
     let tables : BodyExtractor<seq<Wordprocessing.Table>> = 
         asks (fun body -> body.OfType<Wordprocessing.Table>())
 
+    let table (index:int) : BodyExtractor<Wordprocessing.Table> = 
+        bodyExtractor { 
+            let! xs = tables
+            return! liftOption (Seq.tryItem index xs)
+        }
+
 
     let bodyInnerText : BodyExtractor<string> = 
         asks (fun body -> body.InnerText)

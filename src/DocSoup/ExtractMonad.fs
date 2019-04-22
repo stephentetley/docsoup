@@ -94,6 +94,8 @@ module ExtractMonad =
         ExtractMonad <| fun handle -> 
             apply1 ma (focus handle)
 
+
+
     /// Chain a _selector_ and an _extractor_.
     let ( &>> ) (focus:ExtractMonad<'handle1, 'handle2>)
                 (ma:ExtractMonad<'handle2,'ans>) : ExtractMonad<'handle1,'ans> = 
@@ -121,7 +123,10 @@ module ExtractMonad =
             | Ok true -> Ok ()
             | _ -> Error failMsg
             
-    
+    let liftOption (opt:'a option) : ExtractMonad<'handle, 'a> = 
+        match opt with
+        | Some a -> mreturn a
+        | None -> throwError "liftOption - None"
 
     /// fmap 
     let fmapM (fn:'a -> 'b) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
