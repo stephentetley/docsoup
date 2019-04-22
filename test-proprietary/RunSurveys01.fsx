@@ -33,26 +33,13 @@ open FSharp.Data
 #load @"..\src\DocSoup\CellExtractor.fs"
 open DocSoup
 
-#load @"SurveyRecord.fs"
 #load @"SurveyExtractor.fs"
-open SurveyRecord
 open SurveyExtractor
 
 
 let localFile (fileName:string) : string = 
     System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
 
-
-
-//let processSurvey (docPath:string) : unit = 
-//    printfn "Doc: %s" docPath
-//    runOnFileE parseSurvey docPath |> (fun a -> printfn "%A" (surveyToXml a))
-
-
-//let processForm(filePath:string) : unit  =
-//    printfn "Site: '%s'" folderPath
-//    System.IO.DirectoryInfo(folderPath).GetFiles(searchPattern = "*Survey.docx")
-//        |> Array.iter (fun (info:System.IO.FileInfo) -> processSurvey info.FullName)
 
 let getOk (ans:Result<'a, ErrMsg>) : seq<'a> = 
     match ans with
@@ -67,4 +54,4 @@ let main () : unit =
     let okays = files |> Seq.map (fun file -> processSurvey file.FullName) |> Seq.collect getOk
     let table = new SurveyTable(okays)
     use sw = new StreamWriter(path=outfile, append=false)
-    table.Save(writer = sw, separator = ',', quote = '\'')
+    table.Save(writer = sw, separator = ',', quote = '\"')

@@ -338,28 +338,3 @@ module ExtractMonad =
 
 
 
-
-    type TablesParserBuilder = ExtractMonadBuilder<Wordprocessing.Table []> 
-
-    let (tablesParser:TablesParserBuilder) = new ExtractMonadBuilder<Wordprocessing.Table []>()
-
-    type TablesParser<'a> = ExtractMonad<Wordprocessing.Table [],'a> 
-
-    let action2 : TablesParser<unit> = 
-        tablesParser { 
-            return ()
-        }
-
-
-
-    type RowExtractorBuilder = ExtractMonadBuilder<Wordprocessing.TableCell []> 
-    type RowExtractor<'a> = ExtractMonad<Wordprocessing.TableCell [],'a> 
-
-    let (rowExtractor:RowExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableCell []>()
-
-
-
-    let cell (ix:int) : RowExtractor<string> = 
-        ExtractMonad <| fun handle -> 
-            let ans = handle.[ix] in Ok ans.InnerText
-
