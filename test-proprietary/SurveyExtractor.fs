@@ -4,6 +4,16 @@
 
 module SurveyExtractor
 
+open System.IO
+
+open DocSoup
 
 open SurveyRecord
+
+let processSurvey(filePath:string) : Answer<SurveyRow>  =
+    let name = FileInfo(filePath).Name
+    let tempSurvey = { FileName = name }
+    let row = csvRow(tempSurvey)
+    Ok row
+
 

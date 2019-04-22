@@ -25,8 +25,10 @@ open DocumentFormat.OpenXml.Wordprocessing
 #load @"..\src\DocSoup\CellExtractor.fs"
 open DocSoup
 
+let localFile (fileName:string) : string = 
+    System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
 
-let testDoc = @"E:\coding\fsharp\docsoup\data\temp-not-for-github.docx"
+let testDoc = localFile @"temp-not-for-github.docx"
 
 let demo01 () = 
     runDocumentExtractor testDoc documentInnerText
