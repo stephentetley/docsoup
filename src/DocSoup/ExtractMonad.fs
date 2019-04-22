@@ -94,6 +94,13 @@ module ExtractMonad =
         ExtractMonad <| fun handle -> 
             apply1 ma (focus handle)
 
+    /// Chain a _selector_ and an _extractor_.
+    let ( &>> ) (focus:ExtractMonad<'handle1, 'handle2>)
+                (ma:ExtractMonad<'handle2,'ans>) : ExtractMonad<'handle1,'ans> = 
+        bindM focus <| fun h1 -> local (fun _ -> h1) ma
+
+
+
     // ****************************************************
     // Monadic operations
 

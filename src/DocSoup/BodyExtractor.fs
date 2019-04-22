@@ -6,6 +6,8 @@ namespace DocSoup
 [<AutoOpen>]
 module BodyExtractor = 
     
+    open System.Linq
+
     open DocumentFormat.OpenXml
 
     open DocSoup
@@ -15,6 +17,15 @@ module BodyExtractor =
     let (bodyExtractor:BodyExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Body>()
 
     type BodyExtractor<'a> = ExtractMonad<Wordprocessing.Body,'a> 
+
+
+    let paragraphs : BodyExtractor<seq<Wordprocessing.Paragraph>> = 
+        asks (fun body -> body.OfType<Wordprocessing.Paragraph>())
+
+
+    let tables : BodyExtractor<seq<Wordprocessing.Table>> = 
+        asks (fun body -> body.OfType<Wordprocessing.Table>())
+
 
     let bodyInnerText : BodyExtractor<string> = 
         asks (fun body -> body.InnerText)

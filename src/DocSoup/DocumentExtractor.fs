@@ -22,3 +22,6 @@ module DocumentExtractor =
     let documentInnerText : DocumentExtractor<string> = 
         asks (fun document -> document.InnerText)
 
+    let body : DocumentExtractor<Wordprocessing.Body> = 
+        asks (fun document -> document.Body)
+
