@@ -117,16 +117,7 @@ module ExtractMonad =
         bindM ma fn
 
 
-    let assertM (failMsg:string) (cond:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,unit> = 
-        ExtractMonad <| fun handle ->
-            match apply1 cond handle with
-            | Ok true -> Ok ()
-            | _ -> Error failMsg
-            
-    let liftOption (opt:'a option) : ExtractMonad<'handle, 'a> = 
-        match opt with
-        | Some a -> mreturn a
-        | None -> throwError "liftOption - None"
+
 
     /// fmap 
     let fmapM (fn:'a -> 'b) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
@@ -142,6 +133,21 @@ module ExtractMonad =
     /// Flipped fmap.
     let ( <<| ) (fn:'a -> 'b) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
         fmapM fn ma
+
+    let ignoreM (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, unit> = 
+        ma |>> fun _ -> ()
+
+    let assertM (failMsg:string) (cond:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,unit> = 
+        ExtractMonad <| fun handle ->
+            match apply1 cond handle with
+            | Ok true -> Ok ()
+            | _ -> Error failMsg
+            
+    let liftOption (opt:'a option) : ExtractMonad<'handle, 'a> = 
+        match opt with
+        | Some a -> mreturn a
+        | None -> throwError "liftOption - None"
+
 
 
     // liftM (which is fmap)
@@ -276,6 +282,12 @@ module ExtractMonad =
         combineM ma mb
 
 
+    /// Alt operator
+    let ( <|> ) (ma:ExtractMonad<'handle,'a>) 
+                (mb:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'a> = 
+        combineM ma mb
+
+
     /// Haskell Applicative's (<*>)
     let apM (mf:ExtractMonad<'handle,'a ->'b>) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
         mf >>= fun fn -> 
@@ -337,4 +349,111 @@ module ExtractMonad =
         kleisliR mf mg source
 
 
+
+    /// Implemented in CPS 
+    let mapM (mf: 'a -> ExtractMonad<'handle,'b>) 
+             (source:'a list) : ExtractMonad<'handle,'b list> = 
+        ExtractMonad <| fun handle -> 
+            let rec work ys fk sk = 
+                match ys with
+                | [] -> sk []
+                | z :: zs -> 
+                    match apply1 (mf z) handle with
+                    | Error msg -> fk msg
+                    | Ok ans -> 
+                        work zs fk (fun accs ->
+                        sk (ans::accs))
+            work source (fun msg -> Error msg) (fun ans -> Ok ans)
+
+    /// Flipped mapM
+    let forM (source:'a list) 
+             (mf: 'a -> ExtractMonad<'handle,'b>) : ExtractMonad<'handle,'b list> = 
+        mapM mf source
+
+
+    /// Implemented in CPS 
+    let mapMz (mf: 'a -> ExtractMonad<'handle,'b>) 
+             (source:'a list) : ExtractMonad<'handle,unit> = 
+        ExtractMonad <| fun handle -> 
+            let rec work ys cont = 
+                match ys with
+                | [] -> cont (Ok ())
+                | z :: zs -> 
+                    match apply1 (mf z) handle with
+                    | Error msg -> cont (Error msg)
+                    | Ok _ -> 
+                        work zs cont
+            work source (fun ans -> ans)
+
+    /// Flipped mapM
+    let forMz (source:'a list) 
+             (mf: 'a -> ExtractMonad<'handle,'b>) : ExtractMonad<'handle,unit> = 
+        mapMz mf source
+
+
+    let manyM (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, 'a list> =
+        ExtractMonad <| fun handle -> 
+            let rec work cont = 
+                match apply1 ma handle with
+                | Error msg -> cont []
+                | Ok ans -> 
+                    work (fun acc -> cont (ans::acc))
+            work (fun ans -> Ok ans)
+
+    let many1M (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, 'a list> =
+        pipeM2 ma (manyM ma) (fun x xs -> x :: xs)
+
+
+
+    let skipManyM (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, unit> =
+        ExtractMonad <| fun handle -> 
+            let rec work cont = 
+                match apply1 ma handle with
+                | Error msg -> cont ()
+                | Ok ans -> 
+                    work cont
+            work (fun ans -> Ok ans)
+
+    let skipMany1M (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, unit> =
+        pipeM2 ma (skipManyM ma) (fun _ _ -> ())
+
+    let sepBy1M (ma:ExtractMonad<'handle,'a>) 
+                (msep:ExtractMonad<'handle,'sep>) : ExtractMonad<'handle, 'a list> =
+        pipeM2 ma (manyM (seqR msep ma)) (fun x xs -> x :: xs)
+
+    let sepByM (ma:ExtractMonad<'handle,'a>) 
+               (msep:ExtractMonad<'handle,'sep>) : ExtractMonad<'handle, 'a list> =
+        altM (sepBy1M ma msep) (mreturn [])
+
+    let endByM (ma:ExtractMonad<'handle,'a>) 
+               (mend:ExtractMonad<'handle,'sep>) : ExtractMonad<'handle, 'a list> =
+        seqL (manyM ma) mend
+
+    let endBy1M (ma:ExtractMonad<'handle,'a>) 
+                (mend:ExtractMonad<'handle,'sep>) : ExtractMonad<'handle, 'a list> =
+        seqL (many1M ma) mend
+
+    /// The end is optional...
+    let sepEndByM (ma:ExtractMonad<'handle,'a>) 
+                  (msep:ExtractMonad<'handle,'sep>) : ExtractMonad<'handle, 'a list> =
+        seqL (sepByM ma msep) (ignoreM msep  <|> mreturn ())
+
+
+    /// The end is optional...
+    let sepEndBy1M (ma:ExtractMonad<'handle,'a>) 
+                   (msep:ExtractMonad<'handle,'sep>) : ExtractMonad<'handle, 'a list> =
+        seqL (sepBy1M ma msep) (ignoreM msep  <|> mreturn ())
+
+    let countM (ntimes:int) 
+               (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, 'a list> =
+        ExtractMonad <| fun handle -> 
+            let rec work ix fk sk = 
+                if ix <= 0 then 
+                    sk []
+                else
+                    match apply1 ma handle with
+                    | Error msg -> fk (sprintf "count - %s msg" msg)
+                    | Ok ans -> 
+                        work (ix-1) fk (fun acc -> sk (ans::acc))
+            work ntimes (fun msg -> Error msg) (fun ans -> Ok ans)
 
