@@ -24,11 +24,11 @@ open FSharp.Data
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
-#load @"..\src\DocSoup\CellExtract.fs"
-#load @"..\src\DocSoup\RowExtract.fs"
-#load @"..\src\DocSoup\TableExtract.fs"
-#load @"..\src\DocSoup\BodyExtract.fs"
-#load @"..\src\DocSoup\DocumentExtract.fs"
+#load @"..\src\DocSoup\Cell.fs"
+#load @"..\src\DocSoup\Row.fs"
+#load @"..\src\DocSoup\Table.fs"
+#load @"..\src\DocSoup\Body.fs"
+#load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
 #load @"Mk5ReplacementExtract.fs"
@@ -62,13 +62,13 @@ let main () : unit =
 let sampleFile = @"G:\work\Projects\rtu\mk5-mmims\SAMPLE Upgrade Site Works.docx"
 
 let demo01 () = 
-    runDocumentExtractor sampleFile (body &>> extractSiteInfo)
+    Document.runExtractor sampleFile (Document.body &>> extractSiteInfo)
 
 
 let demo02 () = 
-    runDocumentExtractor sampleFile 
-        (body &>> tupleM4 extractSiteInfo 
-                          extractVisitInfo 
-                          extractOutstationInfo
-                          extractAdditionalComments)
+    Document.runExtractor sampleFile 
+        (Document.body &>> tupleM4 extractSiteInfo 
+                                      extractVisitInfo 
+                                      extractOutstationInfo
+                                      extractAdditionalComments)
 

@@ -54,7 +54,7 @@ let demo05a () : Answer<string> =
     Document.runExtractor testDoc (Document.body &>> Body.table 0 &>> Table.row 14 &>> Row.cell 0 &>> Cell.paragraphsText)
 
 let demo05b () : Answer<string> = 
-    Document.runExtractor testDoc (Document.body &>> Body.table 0 &>> Table.tableCell 14 0 &>> Cell.paragraphsText)
+    Document.runExtractor testDoc (Document.body &>> Body.table 0 &>> Table.cell (14,0) &>> Cell.paragraphsText)
 
 
 let dummy1 () = 

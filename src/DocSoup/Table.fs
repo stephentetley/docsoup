@@ -14,7 +14,7 @@ module Table =
 
     type TableExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Table> 
 
-    let (tableExtractor:TableExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Table>()
+    let (extractor:TableExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Table>()
 
     type Extractor<'a> = ExtractMonad<Wordprocessing.Table,'a> 
 
@@ -24,7 +24,7 @@ module Table =
         asks (fun table -> table.Elements<Wordprocessing.TableRow>())
 
     let row (index:int) : Extractor<Wordprocessing.TableRow> = 
-        tableExtractor { 
+        extractor { 
             let! xs = rows
             return! liftOption (Seq.tryItem index xs)
         }
@@ -32,25 +32,25 @@ module Table =
     let rowCount : Extractor<int> = rows |>> Seq.length
 
 
-    let tableCell (rowIndex:int) (columnIndex:int) : Extractor<Wordprocessing.TableCell> = 
-        tableExtractor { 
+    let cell (rowIndex:int, columnIndex:int) : Extractor<Wordprocessing.TableCell> = 
+        extractor { 
             let! xs = row rowIndex |>> fun r1 -> r1.Elements<Wordprocessing.TableCell>()
             return! liftOption (Seq.tryItem columnIndex xs)
         }
 
-    let tableFirstRow : Extractor<Wordprocessing.TableRow> = row 0  
+    let firstRow : Extractor<Wordprocessing.TableRow> = row 0  
 
-    let tableFirstCell : Extractor<Wordprocessing.TableCell> = tableCell 0 0 
+    let firstCell : Extractor<Wordprocessing.TableCell> = cell (0,0)
 
 
     let findRow (predicate:Row.Extractor<bool>) : Extractor<Wordprocessing.TableRow> = 
-        tableExtractor { 
+        extractor { 
             let! xs = rows |>> Seq.toList
             return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
 
     let findRowIndex (predicate:Row.Extractor<bool>) : Extractor<int> = 
-        tableExtractor { 
+        extractor { 
             let! xs = rows |>> Seq.toList
             return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
@@ -64,7 +64,7 @@ module Table =
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
-        tableExtractor { 
+        extractor { 
             let! inner = innerText 
             return Regex.IsMatch(inner, pattern)
         }

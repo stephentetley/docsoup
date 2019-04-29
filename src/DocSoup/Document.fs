@@ -12,7 +12,7 @@ module Document =
 
     type DocumentExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Document> 
 
-    let (documentExtractor:DocumentExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Document>()
+    let (extractor:DocumentExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Document>()
 
     type Extractor<'a> = ExtractMonad<Wordprocessing.Document,'a> 
 

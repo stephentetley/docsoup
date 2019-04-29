@@ -10,21 +10,21 @@ open FSharp.Data
 
 open DocSoup
 
-let extractSiteDetails : BodyExtractor< {| Name: string; SAI: string; Outstation: string |} > = 
-    findTable (tableInnerTextMatch "Site Details") 
-        &>> pipeM3 (tableCell 1 1 &>> cellInnerText)
-                   (tableCell 2 1 &>> cellInnerText)
-                   (tableCell 4 1 &>> cellInnerText)
+let extractSiteDetails : Body.Extractor< {| Name: string; SAI: string; Outstation: string |} > = 
+    Body.findTable (Table.innerTextIsMatch "Site Details") 
+        &>> pipeM3 (Table.cell (1,1) &>> Cell.paragraphsText)
+                   (Table.cell (2,1) &>> Cell.paragraphsText)
+                   (Table.cell (4,1) &>> Cell.paragraphsText)
                    (fun name sai outs -> {| Name = name
                                           ; SAI = sai
                                           ; Outstation = outs |})
 
 
                                           
-let extractWorkDetails : BodyExtractor< {| Name: string; Date: string |} > = 
-    findTable (tableCell 0 0 &>> cellInnerTextMatch "Testing & Recording of Site Work")
-        &>> pipeM2 (tableCell 2 1 &>> cellInnerText)
-                    (tableCell 3 1 &>> cellInnerText)
+let extractWorkDetails : Body.Extractor< {| Name: string; Date: string |} > = 
+    Body.findTable (Table.firstCell &>> Cell.innerTextIsMatch "Testing & Recording of Site Work")
+        &>> pipeM2 (Table.cell (2,1) &>> Cell.paragraphsText)
+                    (Table.cell (3,1) &>> Cell.paragraphsText)
                     (fun name date -> {| Name = name
                                         ; Date = date |})
 
@@ -40,8 +40,9 @@ type SiteWorksTable =
 
 type SiteWorksRow = SiteWorksTable.Row
 
-let siteWorksExtractor : DocumentExtractor<SiteWorksRow> = 
-    body &>> pipeM2 extractSiteDetails 
+let siteWorksExtractor : Document.Extractor<SiteWorksRow> = 
+    Document.body 
+        &>> pipeM2 extractSiteDetails 
                     extractWorkDetails
                     ( fun r1 r2 -> 
                         SiteWorksRow (siteName = r1.Name
@@ -51,4 +52,4 @@ let siteWorksExtractor : DocumentExtractor<SiteWorksRow> =
                                     , outstationName = r1.Outstation ))
 
 let processSiteWorks (filePath:string) : Answer<SiteWorksRow>  =
-    runDocumentExtractor filePath siteWorksExtractor
+    Document.runExtractor filePath siteWorksExtractor

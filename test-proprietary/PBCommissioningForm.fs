@@ -33,26 +33,26 @@ type CommissionsTable =
 type CommissionItem = CommissionsTable.Row
 
 
-let extractCommissionItem (fileName:string) : TableExtractor<CommissionItem> = 
-    tableExtractor { 
-        let! (visit,crew)                   = row 1 &>> tupleM2 (cell 1 &>> cellParagraphsText) (cell 3 &>> cellParagraphsText)
-        let! rtuName                        = row 2 &>> cell 1 &>> cellParagraphsText
-        let! manholeLoc                     = row 3 &>> cell 1 &>> cellParagraphsText
-        let! accessNotes                    = row 4 &>> cell 1 &>> cellParagraphsText
-        let! device1                        = row 8 &>> cell 1 &>> cellParagraphsText
-        let! deviceSerialNo                 = row 9 &>> cell 1 &>> cellParagraphsText
-        let! batterySerialNo                = row 11 &>> cell 1 &>> cellParagraphsText
-        let! sensorType                     = row 13 &>> cell 1 &>> cellParagraphsText
-        let! sensorNote                     = row 14 &>> cell 1 &>> cellParagraphsText
-        let! slabToInvert                   = row 25 &>> cell 1 &>> cellParagraphsText
-        let! offset                         = row 26 &>> cell 1 &>> cellParagraphsText
-        let! liquidLevel                    = row 27 &>> cell 1 &>> cellParagraphsText
-        let! overflowToInvert               = row 28 &>> cell 1 &>> cellParagraphsText
-        let! emergencyOverflowToInvert      = row 29 &>> cell 1 &>> cellParagraphsText
-        let! blankingDistance               = row 30 &>> cell 1 &>> cellParagraphsText
-        let! span                           = row 31 &>> cell 1 &>> cellParagraphsText
-        let! abortedVisitYesNo              = row 33 &>> cell 1 &>> cellParagraphsText
-        let! visitInfo                      = row 34 &>> cell 1 &>> cellParagraphsText
+let extractCommissionItem (fileName:string) : Table.Extractor<CommissionItem> = 
+    Table.extractor { 
+        let! (visit,crew)                   = Table.row 1 &>> tupleM2 (Row.cell 1 &>> Cell.paragraphsText) (Row.cell 3 &>> Cell.paragraphsText)
+        let! rtuName                        = Table.cell (2,1) &>> Cell.paragraphsText
+        let! manholeLoc                     = Table.cell (3,1) &>> Cell.paragraphsText
+        let! accessNotes                    = Table.cell (4,1) &>> Cell.paragraphsText
+        let! device1                        = Table.cell (8,1) &>> Cell.paragraphsText
+        let! deviceSerialNo                 = Table.cell (9,1) &>> Cell.paragraphsText
+        let! batterySerialNo                = Table.cell (11,1) &>> Cell.paragraphsText
+        let! sensorType                     = Table.cell (13,1) &>> Cell.paragraphsText
+        let! sensorNote                     = Table.cell (14,1) &>> Cell.paragraphsText
+        let! slabToInvert                   = Table.cell (25,1) &>> Cell.paragraphsText
+        let! offset                         = Table.cell (26,1) &>> Cell.paragraphsText
+        let! liquidLevel                    = Table.cell (27,1) &>> Cell.paragraphsText
+        let! overflowToInvert               = Table.cell (28,1) &>> Cell.paragraphsText
+        let! emergencyOverflowToInvert      = Table.cell (29,1) &>> Cell.paragraphsText
+        let! blankingDistance               = Table.cell (30,1) &>> Cell.paragraphsText
+        let! span                           = Table.cell (31,1) &>> Cell.paragraphsText
+        let! abortedVisitYesNo              = Table.cell (33,1) &>> Cell.paragraphsText
+        let! visitInfo                      = Table.cell (34,1) &>> Cell.paragraphsText
         return (new CommissionItem ( fileName = fileName
                                   , dateOfVisit = visit
                                   , crew = crew
@@ -76,12 +76,12 @@ let extractCommissionItem (fileName:string) : TableExtractor<CommissionItem> =
                                   ))
     }
 
-let process1 (fileName:string) : DocumentExtractor<CommissionItem> = 
-    body &>> table 0 &>> extractCommissionItem fileName
+let process1 (fileName:string) : Document.Extractor<CommissionItem> = 
+    Document.body &>> Body.table 0 &>> extractCommissionItem fileName
 
 let processCommissionForm(filePath:string) : Answer<CommissionItem>  =
     let name = FileInfo(filePath).Name
-    runDocumentExtractor filePath (process1 name)
+    Document.runExtractor filePath (process1 name)
     
 
 

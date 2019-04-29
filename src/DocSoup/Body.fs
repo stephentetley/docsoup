@@ -14,7 +14,7 @@ module Body =
 
     type BodyExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Body> 
 
-    let (bodyExtractor:BodyExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Body>()
+    let (extractor:BodyExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Body>()
 
     type Extractor<'a> = ExtractMonad<Wordprocessing.Body,'a> 
 
@@ -27,20 +27,20 @@ module Body =
         asks (fun body -> body.OfType<Wordprocessing.Table>())
 
     let table (index:int) : Extractor<Wordprocessing.Table> = 
-        bodyExtractor { 
+        extractor { 
             let! xs = tables
             return! liftOption (Seq.tryItem index xs)
         }
 
     let findTable (predicate:Table.Extractor<bool>) : Extractor<Wordprocessing.Table> = 
-        bodyExtractor { 
+        extractor { 
             let! xs = tables |>> Seq.toList
             return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
 
 
     let findTableIndex (predicate:Table.Extractor<bool>) : Extractor<int> = 
-        bodyExtractor { 
+        extractor { 
             let! xs = tables |>> Seq.toList
             return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
         }

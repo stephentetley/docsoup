@@ -31,7 +31,7 @@ module Row =
     let cellCount : Extractor<int> =  
         cells |>> Seq.length
 
-    let rowFirstCell : Extractor<Wordprocessing.TableCell> = 
+    let firstCell : Extractor<Wordprocessing.TableCell> = 
         cell 0 
 
 

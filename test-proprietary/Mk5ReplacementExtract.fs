@@ -9,34 +9,34 @@ open FSharp.Data
 
 open DocSoup
 
-let extractSiteInfo : BodyExtractor< {| Name: string; SAI: string |} > = 
-    findTable (tableFirstRow &>> rowIsMatch [| "Site Information" |]) 
-        &>> pipeM2 (tableCell 1 1 &>> cellParagraphsText)
-                   (tableCell 2 1 &>> cellParagraphsText)
+let extractSiteInfo : Body.Extractor< {| Name: string; SAI: string |} > = 
+    Body.findTable (Table.firstRow  &>> Row.isMatch [| "Site Information" |]) 
+        &>> pipeM2 (Table.cell (1,1) &>> Cell.paragraphsText)
+                   (Table.cell (2,1) &>> Cell.paragraphsText)
                    (fun name sai -> {| Name = name; SAI = sai |})
 
 
-let extractVisitInfo : BodyExtractor< {| Company: string; Name: string; Date: string |} > = 
-    findTable (tableFirstRow &>> rowIsMatch [| "Install Information" |]) 
-        &>> pipeM3 (tableCell 1 1 &>> cellParagraphsText)
-                   (tableCell 2 1 &>> cellParagraphsText)
-                   (tableCell 3 1 &>> cellParagraphsText)
+let extractVisitInfo : Body.Extractor< {| Company: string; Name: string; Date: string |} > = 
+    Body.findTable (Table.firstRow &>> Row.isMatch [| "Install Information" |]) 
+        &>> pipeM3 (Table.cell (1,1) &>> Cell.paragraphsText)
+                   (Table.cell (2,1) &>> Cell.paragraphsText)
+                   (Table.cell (3,1) &>> Cell.paragraphsText)
                    (fun company eng date -> {| Company = company
                                              ; Name = eng
                                              ; Date = date |})
 
 
 
-let extractOutstationInfo : BodyExtractor< {| Name: string; Address: string
+let extractOutstationInfo : Body.Extractor< {| Name: string; Address: string
                                             ; OldType: string; OldId: string
                                             ; NewType: string; NewId:string |} > = 
-    findTable (tableFirstRow &>> rowIsMatch [| "Outstation Information" |]) 
-        &>> pipeM6 (tableCell 1 1 &>> cellParagraphsText)
-                   (tableCell 2 1 &>> cellParagraphsText)
-                   (tableCell 3 1 &>> cellParagraphsText)
-                   (tableCell 4 1 &>> cellParagraphsText)
-                   (tableCell 5 1 &>> cellParagraphsText)
-                   (tableCell 6 1 &>> cellParagraphsText)
+    Body.findTable (Table.firstRow &>> Row.isMatch [| "Outstation Information" |]) 
+        &>> pipeM6 (Table.cell (1,1) &>> Cell.paragraphsText)
+                   (Table.cell (2,1) &>> Cell.paragraphsText)
+                   (Table.cell (3,1) &>> Cell.paragraphsText)
+                   (Table.cell (4,1) &>> Cell.paragraphsText)
+                   (Table.cell (5,1) &>> Cell.paragraphsText)
+                   (Table.cell (6,1) &>> Cell.paragraphsText)
                    (fun name addr otype oid ntype nid -> 
                         {| Name = name
                         ; Address = addr
@@ -46,13 +46,13 @@ let extractOutstationInfo : BodyExtractor< {| Name: string; Address: string
                         ; NewId = nid |})
 
 
-let extractAdditionalComments : BodyExtractor< {| Issues: string
+let extractAdditionalComments : Body.Extractor< {| Issues: string
                                                 ; QA: string
                                                 ; Maintenance: string |} > = 
-    findTable (tableFirstRow &>> rowIsMatch [| "Additional Comment" |]) 
-        &>> pipeM3 (tableCell 1 1 &>> cellParagraphsText)
-                   (tableCell 2 1 &>> cellParagraphsText)
-                   (tableCell 3 1 &>> cellParagraphsText)
+    Body.findTable (Table.firstRow &>> Row.isMatch [| "Additional Comment" |]) 
+        &>> pipeM3 (Table.cell (1,1) &>> Cell.paragraphsText)
+                   (Table.cell (2,1) &>> Cell.paragraphsText)
+                   (Table.cell (3,1) &>> Cell.paragraphsText)
                    (fun issues qa mainten -> {| Issues = issues
                                              ; QA = qa
                                              ; Maintenance = mainten |})
@@ -77,8 +77,9 @@ type Mk5InstallTable =
 type Mk5InstallRow = Mk5InstallTable.Row
 
 
-let mk5InstallExtractor : DocumentExtractor<Mk5InstallRow> = 
-    body &>> pipeM4 extractSiteInfo 
+let mk5InstallExtractor : Document.Extractor<Mk5InstallRow> = 
+    Document.body 
+        &>> pipeM4 extractSiteInfo 
                     extractVisitInfo
                     extractOutstationInfo
                     extractAdditionalComments
@@ -100,7 +101,7 @@ let mk5InstallExtractor : DocumentExtractor<Mk5InstallRow> =
                                         ))
 
 let processMk5Install (filePath:string) : Answer<Mk5InstallRow>  =
-    runDocumentExtractor filePath mk5InstallExtractor
+    Document.runExtractor filePath mk5InstallExtractor
 
 
 

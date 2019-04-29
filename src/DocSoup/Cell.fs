@@ -15,7 +15,7 @@ module Cell =
 
     type CellExtractorBuilder = ExtractMonadBuilder<Wordprocessing.TableCell> 
 
-    let (cellExtractor:CellExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableCell>()
+    let (extractor:CellExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableCell>()
 
     type Extractor<'a> = ExtractMonad<Wordprocessing.TableCell,'a> 
 
@@ -32,13 +32,13 @@ module Cell =
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
-        cellExtractor { 
+        extractor { 
             let! inner = innerText 
             return Regex.IsMatch(inner, pattern)
         }
 
     let paragraphsTextIsMatch (pattern:string) : Extractor<bool> = 
-        cellExtractor { 
+        extractor { 
             let! inner = paragraphsText 
             return Regex.IsMatch(inner, pattern)
         }

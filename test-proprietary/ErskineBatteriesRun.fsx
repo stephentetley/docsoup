@@ -24,11 +24,11 @@ open FSharp.Data
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
-#load @"..\src\DocSoup\CellExtract.fs"
-#load @"..\src\DocSoup\RowExtract.fs"
-#load @"..\src\DocSoup\TableExtract.fs"
-#load @"..\src\DocSoup\BodyExtract.fs"
-#load @"..\src\DocSoup\DocumentExtract.fs"
+#load @"..\src\DocSoup\Cell.fs"
+#load @"..\src\DocSoup\Row.fs"
+#load @"..\src\DocSoup\Table.fs"
+#load @"..\src\DocSoup\Body.fs"
+#load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
 #load @"ErskineBatteryExtract.fs"
@@ -69,7 +69,7 @@ let point : {| X:int; Y:int |} = {| X = 3; Y = 4 |}
 let sampleFile = @"G:\work\Projects\rtu\Erskines\erskines-incoming\Batch_02 DU\ALBERT_WTW\ALBERT_WTW Erskine Battery Site Works.docx"
 
 let demo01 () = 
-    runDocumentExtractor sampleFile documentInnerText
+    Document.runExtractor sampleFile Document.innerText
 
 
 let dummy1 () = 
@@ -83,31 +83,31 @@ let dummy2 () =
 
 let demo02 (pattern:string)  = 
     let proc () = 
-        body 
-            &>> findTable (tableInnerTextMatch pattern)
-            &>> tableInnerText
-    runDocumentExtractor sampleFile (proc ())
+        Document.body 
+            &>> Body.findTable (Table.innerTextIsMatch pattern)
+            &>> Table.innerText
+    Document.runExtractor sampleFile (proc ())
          
 
 
 let demo03 (number:int)  = 
     let proc () = 
         findM (fun ix -> mreturn (ix = number)) [1;2;3;4;5]
-    runDocumentExtractor sampleFile (proc ())
+    Document.runExtractor sampleFile (proc ())
 
 let demo04 ()  = 
-    runDocumentExtractor sampleFile (body &>> extractSiteDetails)
+    Document.runExtractor sampleFile (Document.body &>> extractSiteDetails)
 
 
 let demo05 (pattern:string)  = 
     let proc () = 
-        body 
-            &>> findTable (tableCell 0 0 &>> cellInnerTextMatch pattern)
-            &>> tableInnerText
-    runDocumentExtractor sampleFile (proc ())
+        Document.body 
+            &>> Body.findTable (Table.cell (0,0) &>> Cell.innerTextIsMatch pattern)
+            &>> Table.innerText
+    Document.runExtractor sampleFile (proc ())
 
 let demo06 ()  = 
-    runDocumentExtractor sampleFile siteWorksExtractor
+    Document.runExtractor sampleFile siteWorksExtractor
 
 
     
