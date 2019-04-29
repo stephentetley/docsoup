@@ -2,10 +2,9 @@
 // License: BSD 3 Clause
 
 #r "netstandard"
-
-
-#I @"C:\Users\stephen\.nuget\packages\system.io.filesystem.primitives\4.3.0\lib\netstandard1.3"
 #r "System.IO.FileSystem.Primitives"
+
+
 
 #I @"C:\Users\stephen\.nuget\packages\DocumentFormat.OpenXml\2.9.1\lib\netstandard1.3"
 #r "DocumentFormat.OpenXml"
@@ -18,11 +17,11 @@ open DocumentFormat.OpenXml.Wordprocessing
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
-#load @"..\src\DocSoup\DocumentExtractor.fs"
-#load @"..\src\DocSoup\BodyExtractor.fs"
-#load @"..\src\DocSoup\TableExtractor.fs"
-#load @"..\src\DocSoup\RowExtractor.fs"
-#load @"..\src\DocSoup\CellExtractor.fs"
+#load @"..\src\DocSoup\CellExtract.fs"
+#load @"..\src\DocSoup\RowExtract.fs"
+#load @"..\src\DocSoup\TableExtract.fs"
+#load @"..\src\DocSoup\BodyExtract.fs"
+#load @"..\src\DocSoup\DocumentExtract.fs"
 open DocSoup
 
 let localFile (fileName:string) : string = 
@@ -56,4 +55,8 @@ let demo05a () : Answer<string> =
 
 let demo05b () : Answer<string> = 
     runDocumentExtractor testDoc (body &>> table 0 &>> tableCell 14 0 &>> cellParagraphsText)
+
+
+
+
 

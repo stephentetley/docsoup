@@ -24,11 +24,11 @@ open FSharp.Data
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
-#load @"..\src\DocSoup\DocumentExtractor.fs"
-#load @"..\src\DocSoup\CellExtractor.fs"
-#load @"..\src\DocSoup\RowExtractor.fs"
-#load @"..\src\DocSoup\TableExtractor.fs"
-#load @"..\src\DocSoup\BodyExtractor.fs"
+#load @"..\src\DocSoup\CellExtract.fs"
+#load @"..\src\DocSoup\RowExtract.fs"
+#load @"..\src\DocSoup\TableExtract.fs"
+#load @"..\src\DocSoup\BodyExtract.fs"
+#load @"..\src\DocSoup\DocumentExtract.fs"
 open DocSoup
 
 #load @"PBCommissioningForm.fs"

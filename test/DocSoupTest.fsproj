@@ -6,9 +6,6 @@
 
   <ItemGroup>
     <None Include="Temp01.fsx" />
-    <None Include="Temp02.fsx" />
-    <None Include="Temp03.fsx" />
-    <None Include="Temp04.fsx" />
     <None Include="TempOpenXml01.fsx" />
     <None Include="TempMonad.fsx" />
   </ItemGroup>

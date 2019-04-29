@@ -4,7 +4,7 @@
 namespace DocSoup
 
 [<AutoOpen>]
-module RowExtractor = 
+module RowExtract = 
     
     open System.Text.RegularExpressions
 
@@ -27,6 +27,9 @@ module RowExtractor =
             let! xs = cells
             return! liftOption (Seq.tryItem index xs)
         }
+
+    let cellCount : RowExtractor<int> =  
+        cells |>> Seq.length
 
     let findCell (predicate:CellExtractor<bool>) : RowExtractor<Wordprocessing.TableCell> = 
         rowExtractor { 

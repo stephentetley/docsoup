@@ -2,7 +2,7 @@
 // License: BSD 3 Clause
 
 
-module ErskineBatteryExtractor
+module ErskineBatteryExtract
 
 open System.IO
 

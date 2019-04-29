@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <Compile Include="PBCommissioningForm.fs" />
-    <Compile Include="ErskineBatteryExtractor.fs" />
+    <Compile Include="ErskineBatteryExtract.fs" />
     <None Include="PBRun.fsx" />
     <None Include="ErskineBatteriesRun.fsx" />
   </ItemGroup>

@@ -4,7 +4,7 @@
 namespace DocSoup
 
 [<AutoOpen>]
-module DocumentExtractor = 
+module DocumentExtract = 
     
     open DocumentFormat.OpenXml
 

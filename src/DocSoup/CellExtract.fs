@@ -4,7 +4,7 @@
 namespace DocSoup
 
 [<AutoOpen>]
-module CellExtractor = 
+module CellExtract = 
     
     open System.Text.RegularExpressions
 

@@ -4,7 +4,7 @@
 namespace DocSoup
 
 [<AutoOpen>]
-module TableExtractor = 
+module TableExtract = 
     
     open System.Text.RegularExpressions
 
@@ -28,6 +28,8 @@ module TableExtractor =
             let! xs = rows
             return! liftOption (Seq.tryItem index xs)
         }
+
+    let rowCount : TableExtractor<int> = rows |>> Seq.length
 
 
     let tableCell (rowIndex:int) (columnIndex:int) : TableExtractor<Wordprocessing.TableCell> = 

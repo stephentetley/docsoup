@@ -4,7 +4,7 @@
 namespace DocSoup
 
 [<AutoOpen>]
-module BodyExtractor = 
+module BodyExtract = 
     
     open System.Linq
 

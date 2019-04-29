@@ -4,14 +4,13 @@
 
 #r "netstandard"
 #r "System.Xml.Linq"
-
+#r "System.IO.FileSystem.Primitives"
 
 open System.IO
-open System.Text.RegularExpressions
 open System.Linq
+open System.Text.RegularExpressions
 
-#I @"C:\Users\stephen\.nuget\packages\system.io.filesystem.primitives\4.3.0\lib\netstandard1.3"
-#r "System.IO.FileSystem.Primitives"
+
 
 #I @"C:\Users\stephen\.nuget\packages\DocumentFormat.OpenXml\2.9.1\lib\netstandard1.3"
 #r "DocumentFormat.OpenXml"
