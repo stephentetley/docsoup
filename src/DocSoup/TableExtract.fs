@@ -38,6 +38,12 @@ module TableExtract =
             return! liftOption (Seq.tryItem columnIndex xs)
         }
 
+    let tableFirstRow : TableExtractor<Wordprocessing.TableRow> = 
+        row 0  
+
+    let tableFirstCell : TableExtractor<Wordprocessing.TableCell> = 
+        tableCell 0 0 
+
 
     let findRow (predicate:RowExtractor<bool>) : TableExtractor<Wordprocessing.TableRow> = 
         tableExtractor { 

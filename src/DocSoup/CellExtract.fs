@@ -36,3 +36,13 @@ module CellExtract =
             let! inner = cellInnerText 
             return Regex.IsMatch(inner, pattern)
         }
+
+    let cellParagraphsTextMatch (pattern:string) : CellExtractor<bool> = 
+        cellExtractor { 
+            let! inner = cellParagraphsText 
+            return Regex.IsMatch(inner, pattern)
+        }
+
+    let cellIsMatch (pattern:string) : CellExtractor<bool> = 
+        cellParagraphsTextMatch pattern
+

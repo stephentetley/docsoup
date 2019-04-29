@@ -57,6 +57,7 @@ let demo05b () : Answer<string> =
     runDocumentExtractor testDoc (body &>> table 0 &>> tableCell 14 0 &>> cellParagraphsText)
 
 
-
+let dummy1 () = 
+    List.forall (fun x -> x % 2 = 0) [2;4;6]
 
 

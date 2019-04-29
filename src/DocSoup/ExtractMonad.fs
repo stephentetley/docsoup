@@ -148,6 +148,15 @@ module ExtractMonad =
         | Some a -> mreturn a
         | None -> throwError "liftOption - None"
 
+    /// Lift an action that may fail (e.g. an IO operation).
+    /// If the action does fail, replace the hard error with 
+    /// a (soft) error within the monad.
+    let liftAction (errMsg:string) (action: unit -> 'a) : ExtractMonad<'handle, 'a> = 
+        try 
+            let ans = action ()
+            mreturn ans
+        with
+        | _ -> throwError errMsg
 
 
     // liftM (which is fmap)
@@ -486,3 +495,15 @@ module ExtractMonad =
                     | Error msg -> work (ix+1) rest fk sk 
             work 0 items (fun msg -> Error msg) (fun ans -> Ok ans)
 
+    let forallM (predicate:'a -> ExtractMonad<'handle,bool>)
+                (items:'a list) : ExtractMonad<'handle, bool> = 
+        ExtractMonad <| fun handle -> 
+            let rec work xs cont = 
+                match xs with
+                | [] -> cont true
+                | item :: rest -> 
+                    match apply1 (predicate item) handle with
+                    | Ok true -> work rest cont
+                    | Ok false -> cont false
+                    | Error msg -> cont false
+            work items (fun ans -> Ok ans)

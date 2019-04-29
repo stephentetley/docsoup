@@ -31,6 +31,10 @@ module RowExtract =
     let cellCount : RowExtractor<int> =  
         cells |>> Seq.length
 
+    let rowFirstCell : RowExtractor<Wordprocessing.TableCell> = 
+        cell 0 
+
+
     let findCell (predicate:CellExtractor<bool>) : RowExtractor<Wordprocessing.TableCell> = 
         rowExtractor { 
             let! xs = cells |>> Seq.toList
@@ -54,4 +58,13 @@ module RowExtract =
         rowExtractor { 
             let! inner = rowInnerText 
             return Regex.IsMatch(inner, pattern)
+        }
+
+
+    let rowIsMatch (cellPatterns:string []) : RowExtractor<bool> = 
+        rowExtractor { 
+            let! arrCells = cells |>> Seq.toArray
+            let! pairs = 
+                liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
+            return! forallM (fun (patt,cel) -> local (fun _ -> cel) (cellIsMatch patt)) pairs
         }
