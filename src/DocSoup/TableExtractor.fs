@@ -6,6 +6,8 @@ namespace DocSoup
 [<AutoOpen>]
 module TableExtractor = 
     
+    open System.Text.RegularExpressions
+
     open DocumentFormat.OpenXml
 
     open DocSoup
@@ -34,3 +36,13 @@ module TableExtractor =
 
     let tableInnerText : TableExtractor<string> = 
         asks (fun table -> table.InnerText)
+
+    /// This function matches the regex pattern to the 'inner text'
+    /// of the table.
+    /// The inner text does not preserve whitespace, so **do not**
+    /// try to match against a whitespace sensitive pattern.
+    let tableInnerTextMatch (pattern:string) : TableExtractor<bool> = 
+        tableExtractor { 
+            let! inner = tableInnerText 
+            return Regex.IsMatch(inner, pattern)
+        }

@@ -2,7 +2,7 @@
 // License: BSD 3 Clause
 
 
-module SurveyExtractor
+module PBCommissioningForm
 
 open System.IO
 
@@ -12,7 +12,7 @@ open DocSoup
 
 
 [<Literal>]
-let SurveySchema = 
+let CommissionFormSchema = 
     "File Name(string), Date Of Visit(string), Crew(string)," +
     "RTU Name(string), Manhole Location(string), Access Notes(string)," +
     "Device1(string), Device Serial No(string), Battery Serial No(string)," +
@@ -25,15 +25,15 @@ let SurveySchema =
 
 /// Trick - setting Sample to ExportSchema rather than a sample "row" writes the schema as
 /// Headers in the output.
-type SurveyTable = 
-    CsvProvider< Sample = SurveySchema,
-                 Schema = SurveySchema,
+type CommissionsTable = 
+    CsvProvider< Sample = CommissionFormSchema,
+                 Schema = CommissionFormSchema,
                  HasHeaders = true >
 
-type SurveyRow = SurveyTable.Row
+type CommissionItem = CommissionsTable.Row
 
 
-let extractSurveyFromTable0 (fileName:string) : TableExtractor<SurveyRow> = 
+let extractCommissionItem (fileName:string) : TableExtractor<CommissionItem> = 
     tableExtractor { 
         let! (visit,crew)                   = row 1 &>> tupleM2 (cell 1 &>> cellParagraphsText) (cell 3 &>> cellParagraphsText)
         let! rtuName                        = row 2 &>> cell 1 &>> cellParagraphsText
@@ -53,33 +53,33 @@ let extractSurveyFromTable0 (fileName:string) : TableExtractor<SurveyRow> =
         let! span                           = row 31 &>> cell 1 &>> cellParagraphsText
         let! abortedVisitYesNo              = row 33 &>> cell 1 &>> cellParagraphsText
         let! visitInfo                      = row 34 &>> cell 1 &>> cellParagraphsText
-        return (new SurveyRow ( fileName = fileName
-                              , dateOfVisit = visit
-                              , crew = crew
-                              , rtuName = rtuName
-                              , manholeLocation = manholeLoc
-                              , accessNotes = accessNotes
-                              , device1 = device1
-                              , deviceSerialNo = deviceSerialNo
-                              , batterySerialNo = batterySerialNo
-                              , sensorType = sensorType
-                              , sensorNote = sensorNote
-                              , slabToInvert = slabToInvert
-                              , offset = offset
-                              , liquidLevel = liquidLevel
-                              , overflowToInvert = overflowToInvert
-                              , emergencyOverflowToInvert = emergencyOverflowToInvert
-                              , blankingDistance = blankingDistance
-                              , span = span
-                              , abortedVisitYesNo = abortedVisitYesNo
-                              , visitInfo = visitInfo
-                              ))
+        return (new CommissionItem ( fileName = fileName
+                                  , dateOfVisit = visit
+                                  , crew = crew
+                                  , rtuName = rtuName
+                                  , manholeLocation = manholeLoc
+                                  , accessNotes = accessNotes
+                                  , device1 = device1
+                                  , deviceSerialNo = deviceSerialNo
+                                  , batterySerialNo = batterySerialNo
+                                  , sensorType = sensorType
+                                  , sensorNote = sensorNote
+                                  , slabToInvert = slabToInvert
+                                  , offset = offset
+                                  , liquidLevel = liquidLevel
+                                  , overflowToInvert = overflowToInvert
+                                  , emergencyOverflowToInvert = emergencyOverflowToInvert
+                                  , blankingDistance = blankingDistance
+                                  , span = span
+                                  , abortedVisitYesNo = abortedVisitYesNo
+                                  , visitInfo = visitInfo
+                                  ))
     }
 
-let process1 (fileName:string) : DocumentExtractor<SurveyRow> = 
-    body &>> table 0 &>> extractSurveyFromTable0 fileName
+let process1 (fileName:string) : DocumentExtractor<CommissionItem> = 
+    body &>> table 0 &>> extractCommissionItem fileName
 
-let processSurvey(filePath:string) : Answer<SurveyRow>  =
+let processCommissionForm(filePath:string) : Answer<CommissionItem>  =
     let name = FileInfo(filePath).Name
     runDocumentExtractor filePath (process1 name)
     

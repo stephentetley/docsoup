@@ -32,6 +32,11 @@ module BodyExtractor =
             return! liftOption (Seq.tryItem index xs)
         }
 
+    let findTable (predicate:TableExtractor<bool>) : BodyExtractor<Wordprocessing.Table> = 
+        bodyExtractor { 
+            let! xs = tables |>> Seq.toList
+            return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
+        }
 
     let bodyInnerText : BodyExtractor<string> = 
         asks (fun body -> body.InnerText)

@@ -9,10 +9,10 @@
     <Compile Include="DocSoup\Internal\OpenXml.fs" />
     <Compile Include="DocSoup\ExtractMonad.fs" />
     <Compile Include="DocSoup\DocumentExtractor.fs" />
-    <Compile Include="DocSoup\BodyExtractor.fs" />
-    <Compile Include="DocSoup\TableExtractor.fs" />
-    <Compile Include="DocSoup\RowExtractor.fs" />
     <Compile Include="DocSoup\CellExtractor.fs" />
+    <Compile Include="DocSoup\RowExtractor.fs" />
+    <Compile Include="DocSoup\TableExtractor.fs" />
+    <Compile Include="DocSoup\BodyExtractor.fs" />
   </ItemGroup>
 
   <ItemGroup>

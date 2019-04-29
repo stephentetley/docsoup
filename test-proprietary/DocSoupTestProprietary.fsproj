@@ -5,8 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="SurveyExtractor.fs" />
-    <None Include="RunSurveys01.fsx" />
+    <Compile Include="PBCommissioningForm.fs" />
+    <Compile Include="ErskineBatteryExtractor.fs" />
+    <None Include="PBRun.fsx" />
+    <None Include="ErskineBatteriesRun.fsx" />
   </ItemGroup>
 
   <ItemGroup>

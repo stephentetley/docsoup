@@ -457,3 +457,19 @@ module ExtractMonad =
                         work (ix-1) fk (fun acc -> sk (ans::acc))
             work ntimes (fun msg -> Error msg) (fun ans -> Ok ans)
 
+
+    let findM (predicate:'a -> ExtractMonad<'handle,bool>)
+              (items:'a list) : ExtractMonad<'handle,'a> = 
+        ExtractMonad <| fun handle -> 
+            let rec work xs fk sk = 
+                match xs with
+                | [] -> fk "findM not found"
+                | item :: rest -> 
+                    match apply1 (predicate item) handle with
+                    | Ok true -> 
+                        sk item
+                    | Ok false -> work rest fk sk 
+                    | Error msg -> work rest fk sk 
+            work items (fun msg -> Error msg) (fun ans -> Ok ans)
+
+
