@@ -17,11 +17,11 @@ open DocumentFormat.OpenXml.Wordprocessing
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
-#load @"..\src\DocSoup\CellExtract.fs"
-#load @"..\src\DocSoup\RowExtract.fs"
-#load @"..\src\DocSoup\TableExtract.fs"
-#load @"..\src\DocSoup\BodyExtract.fs"
-#load @"..\src\DocSoup\DocumentExtract.fs"
+#load @"..\src\DocSoup\Cell.fs"
+#load @"..\src\DocSoup\Row.fs"
+#load @"..\src\DocSoup\Table.fs"
+#load @"..\src\DocSoup\Body.fs"
+#load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
 let localFile (fileName:string) : string = 
@@ -30,31 +30,31 @@ let localFile (fileName:string) : string =
 let testDoc = localFile @"temp-not-for-github.docx"
 
 let demo01 () = 
-    runDocumentExtractor testDoc documentInnerText
+    Document.runExtractor testDoc Document.innerText
 
 
 
 let demo02 () = 
-    runDocumentExtractor testDoc (body &>> bodyInnerText)
+    Document.runExtractor testDoc (Document.body &>> Body.innerText)
 
 
 let demo03a () : Answer<int> = 
-    runDocumentExtractor testDoc (body &>> paragraphs &>> asks Seq.length)
+    Document.runExtractor testDoc (Document.body &>> Body.paragraphs &>> asks Seq.length)
 
 let demo03b () : Answer<int> = 
-    runDocumentExtractor testDoc (body &>> tables &>> asks Seq.length)
+    Document.runExtractor testDoc (Document.body &>> Body.tables &>> asks Seq.length)
 
 
 
 let demo04 () : Answer<string> = 
-    runDocumentExtractor testDoc (body &>> table 0 &>> row 0 &>> rowInnerText)
+    Document.runExtractor testDoc (Document.body &>> Body.table 0 &>> Table.row 0 &>> Row.innerText)
 
 
 let demo05a () : Answer<string> = 
-    runDocumentExtractor testDoc (body &>> table 0 &>> row 14 &>> cell 0 &>> cellParagraphsText)
+    Document.runExtractor testDoc (Document.body &>> Body.table 0 &>> Table.row 14 &>> Row.cell 0 &>> Cell.paragraphsText)
 
 let demo05b () : Answer<string> = 
-    runDocumentExtractor testDoc (body &>> table 0 &>> tableCell 14 0 &>> cellParagraphsText)
+    Document.runExtractor testDoc (Document.body &>> Body.table 0 &>> Table.tableCell 14 0 &>> Cell.paragraphsText)
 
 
 let dummy1 () = 

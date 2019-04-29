@@ -3,8 +3,8 @@
 
 namespace DocSoup
 
-[<AutoOpen>]
-module CellExtract = 
+[<RequireQualifiedAccess>]
+module Cell = 
     
     open System.Text.RegularExpressions
 
@@ -17,32 +17,32 @@ module CellExtract =
 
     let (cellExtractor:CellExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableCell>()
 
-    type CellExtractor<'a> = ExtractMonad<Wordprocessing.TableCell,'a> 
+    type Extractor<'a> = ExtractMonad<Wordprocessing.TableCell,'a> 
 
-    let cellInnerText : CellExtractor<string> = 
+    let innerText : Extractor<string> = 
         asks (fun cell -> cell.InnerText)
 
     /// Get the cell "Paragraphs text" which should preserves newline.
     /// Currently doesn't seem to...
-    let cellParagraphsText : CellExtractor<string> = 
+    let paragraphsText : Extractor<string> = 
         asks (fun cell -> cell.Elements<Wordprocessing.Paragraph>() |> Seq.map (fun text -> text.InnerText)  |> Common.fromLines)
         
     /// This function matches the regex pattern to the 'inner text'
     /// of the cell.
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
-    let cellInnerTextMatch (pattern:string) : CellExtractor<bool> = 
+    let innerTextIsMatch (pattern:string) : Extractor<bool> = 
         cellExtractor { 
-            let! inner = cellInnerText 
+            let! inner = innerText 
             return Regex.IsMatch(inner, pattern)
         }
 
-    let cellParagraphsTextMatch (pattern:string) : CellExtractor<bool> = 
+    let paragraphsTextIsMatch (pattern:string) : Extractor<bool> = 
         cellExtractor { 
-            let! inner = cellParagraphsText 
+            let! inner = paragraphsText 
             return Regex.IsMatch(inner, pattern)
         }
 
-    let cellIsMatch (pattern:string) : CellExtractor<bool> = 
-        cellParagraphsTextMatch pattern
+    let isMatch (pattern:string) : Extractor<bool> = 
+        paragraphsTextIsMatch pattern
 

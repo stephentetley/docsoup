@@ -3,8 +3,8 @@
 
 namespace DocSoup
 
-[<AutoOpen>]
-module TableExtract = 
+[<RequireQualifiedAccess>]
+module Table = 
     
     open System.Text.RegularExpressions
 
@@ -16,57 +16,55 @@ module TableExtract =
 
     let (tableExtractor:TableExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Table>()
 
-    type TableExtractor<'a> = ExtractMonad<Wordprocessing.Table,'a> 
+    type Extractor<'a> = ExtractMonad<Wordprocessing.Table,'a> 
 
 
 
-    let rows : TableExtractor<seq<Wordprocessing.TableRow>> = 
+    let rows : Extractor<seq<Wordprocessing.TableRow>> = 
         asks (fun table -> table.Elements<Wordprocessing.TableRow>())
 
-    let row (index:int) : TableExtractor<Wordprocessing.TableRow> = 
+    let row (index:int) : Extractor<Wordprocessing.TableRow> = 
         tableExtractor { 
             let! xs = rows
             return! liftOption (Seq.tryItem index xs)
         }
 
-    let rowCount : TableExtractor<int> = rows |>> Seq.length
+    let rowCount : Extractor<int> = rows |>> Seq.length
 
 
-    let tableCell (rowIndex:int) (columnIndex:int) : TableExtractor<Wordprocessing.TableCell> = 
+    let tableCell (rowIndex:int) (columnIndex:int) : Extractor<Wordprocessing.TableCell> = 
         tableExtractor { 
             let! xs = row rowIndex |>> fun r1 -> r1.Elements<Wordprocessing.TableCell>()
             return! liftOption (Seq.tryItem columnIndex xs)
         }
 
-    let tableFirstRow : TableExtractor<Wordprocessing.TableRow> = 
-        row 0  
+    let tableFirstRow : Extractor<Wordprocessing.TableRow> = row 0  
 
-    let tableFirstCell : TableExtractor<Wordprocessing.TableCell> = 
-        tableCell 0 0 
+    let tableFirstCell : Extractor<Wordprocessing.TableCell> = tableCell 0 0 
 
 
-    let findRow (predicate:RowExtractor<bool>) : TableExtractor<Wordprocessing.TableRow> = 
+    let findRow (predicate:Row.Extractor<bool>) : Extractor<Wordprocessing.TableRow> = 
         tableExtractor { 
             let! xs = rows |>> Seq.toList
             return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
 
-    let findRowIndex (predicate:RowExtractor<bool>) : TableExtractor<int> = 
+    let findRowIndex (predicate:Row.Extractor<bool>) : Extractor<int> = 
         tableExtractor { 
             let! xs = rows |>> Seq.toList
             return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
 
 
-    let tableInnerText : TableExtractor<string> = 
+    let innerText : Extractor<string> = 
         asks (fun table -> table.InnerText)
 
     /// This function matches the regex pattern to the 'inner text'
     /// of the table.
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
-    let tableInnerTextMatch (pattern:string) : TableExtractor<bool> = 
+    let innerTextIsMatch (pattern:string) : Extractor<bool> = 
         tableExtractor { 
-            let! inner = tableInnerText 
+            let! inner = innerText 
             return Regex.IsMatch(inner, pattern)
         }

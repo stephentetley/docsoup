@@ -3,8 +3,8 @@
 
 namespace DocSoup
 
-[<AutoOpen>]
-module DocumentExtract = 
+[<RequireQualifiedAccess>]
+module Document = 
     
     open DocumentFormat.OpenXml
 
@@ -14,14 +14,14 @@ module DocumentExtract =
 
     let (documentExtractor:DocumentExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Document>()
 
-    type DocumentExtractor<'a> = ExtractMonad<Wordprocessing.Document,'a> 
+    type Extractor<'a> = ExtractMonad<Wordprocessing.Document,'a> 
 
-    let runDocumentExtractor (filePath:string) (ma:DocumentExtractor<'a>) : Answer<'a> = 
+    let runExtractor (filePath:string) (ma:Extractor<'a>) : Answer<'a> = 
         runExtractMonad filePath (fun wpdocument -> wpdocument.MainDocumentPart.Document) ma
 
-    let documentInnerText : DocumentExtractor<string> = 
+    let innerText : Extractor<string> = 
         asks (fun document -> document.InnerText)
 
-    let body : DocumentExtractor<Wordprocessing.Body> = 
+    let body : Extractor<Wordprocessing.Body> = 
         asks (fun document -> document.Body)
 
