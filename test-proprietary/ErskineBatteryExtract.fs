@@ -10,8 +10,7 @@ open FSharp.Data
 
 open DocSoup
 
-let extractSiteDetails 
-        : BodyExtractor< {| Name: string; SAI: string; Outstation: string |} > = 
+let extractSiteDetails : BodyExtractor< {| Name: string; SAI: string; Outstation: string |} > = 
     findTable (tableInnerTextMatch "Site Details") 
         &>> pipeM3 (tableCell 1 1 &>> cellInnerText)
                    (tableCell 2 1 &>> cellInnerText)
@@ -22,8 +21,7 @@ let extractSiteDetails
 
 
                                           
-let extractWorkDetails 
-        : BodyExtractor< {| Name: string; Date: string |} > = 
+let extractWorkDetails : BodyExtractor< {| Name: string; Date: string |} > = 
     findTable (tableCell 0 0 &>> cellInnerTextMatch "Testing & Recording of Site Work")
         &>> pipeM2 (tableCell 2 1 &>> cellInnerText)
                     (tableCell 3 1 &>> cellInnerText)

@@ -68,3 +68,5 @@ module RowExtract =
                 liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
             return! forallM (fun (patt,cel) -> local (fun _ -> cel) (cellIsMatch patt)) pairs
         }
+
+    /// TODO - use regex groups for a function like rowIsMatch that returns matches

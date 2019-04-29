@@ -45,6 +45,20 @@ let getOk (ans:Result<'a, ErrMsg>) : seq<'a> =
     | Error msg -> printfn "%s" msg; Seq.empty
 
 
+let main () : unit = 
+    let toplevel = @"G:\work\Projects\rtu\mk5-mmims\Incoming"
+    let outfile = localFile "mk5-mmim-installs.csv"
+    // note some names mispelled as 'Words' not 'Works'...
+    let okays = 
+        System.IO.DirectoryInfo(toplevel).GetFiles(searchPattern = "*Site Wor?s.docx", searchOption = SearchOption.AllDirectories)
+            |> Seq.map (fun file -> 
+                            printfn "%s" file.Name ; processMk5Install file.FullName) 
+            |> Seq.collect getOk
+    let table = new Mk5InstallTable(okays)
+    use sw = new StreamWriter(path=outfile, append=false)
+    table.Save(writer = sw, separator = ',', quote = '\"')
+
+
 let sampleFile = @"G:\work\Projects\rtu\mk5-mmims\SAMPLE Upgrade Site Works.docx"
 
 let demo01 () = 
@@ -53,5 +67,8 @@ let demo01 () =
 
 let demo02 () = 
     runDocumentExtractor sampleFile 
-        (body &>> tupleM2 extractSiteInfo extractInstallInfo)
+        (body &>> tupleM4 extractSiteInfo 
+                          extractVisitInfo 
+                          extractOutstationInfo
+                          extractAdditionalComments)
 

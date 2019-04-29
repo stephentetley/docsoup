@@ -6,6 +6,7 @@ namespace DocSoup
 [<AutoOpen>]
 module ExtractMonad = 
     
+    open System.Text.RegularExpressions
     
     open DocumentFormat.OpenXml
     open DocumentFormat.OpenXml.Packaging
@@ -61,12 +62,20 @@ module ExtractMonad =
     // ****************************************************
     // Run
 
+    let private isWordTempFile (filePath:string) : bool = 
+        let fileName = System.IO.FileInfo(filePath).Name
+        Regex.IsMatch(input = fileName, pattern = "^~\$")
+
     let runExtractMonad (filePath:string) 
                         (project:WordprocessingDocument -> 'handle)  
                         (ma:ExtractMonad<'handle,'a>) : Result<'a,ErrMsg> = 
-        match OpenXml.primitiveExtract filePath (fun doc -> apply1 ma (project doc)) with
-        | Error msg -> Error msg
-        | Ok ans -> ans
+        if isWordTempFile filePath then 
+            Error (sprintf "Invalid Word file: %s" filePath) 
+        else
+            match OpenXml.primitiveExtract filePath 
+                                           (fun doc -> apply1 ma (project doc)) with
+            | Error msg -> Error msg
+            | Ok ans -> ans
 
 
     // ****************************************************
