@@ -39,21 +39,29 @@ let localFile (fileName:string) : string =
     System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
 
 
-//let getOk (ans:Result<'a, ErrMsg>) : seq<'a> = 
-//    match ans with
-//    | Ok a -> Seq.singleton a
-//    | Error msg -> printfn "%s" msg; Seq.empty
+let getOk (ans:Result<'a, ErrMsg>) : seq<'a> = 
+    match ans with
+    | Ok a -> Seq.singleton a
+    | Error msg -> printfn "%s" msg; Seq.empty
 
-//let main () : unit = 
-//    let root = @"G:\work\Projects\uqpb\Site Commissioning Forms"
-//    let outfile = localFile "uqpb-commissions.csv"
-//    let okays = 
-//        System.IO.DirectoryInfo(root).GetFiles(searchPattern = "*.docx")
-//            |> Seq.map (fun file -> processCommissionForm file.FullName) 
-//            |> Seq.collect getOk
-//    let table = new CommissionsTable(okays)
-//    use sw = new StreamWriter(path=outfile, append=false)
-//    table.Save(writer = sw, separator = ',', quote = '\"')
+let processBatch (info:DirectoryInfo) : unit = 
+    let outfile = localFile (sprintf "%s erskines.csv" info.Name)
+    let okays = 
+        System.IO.DirectoryInfo(info.FullName).GetFiles(searchPattern = "*Site Works.docx", searchOption = SearchOption.AllDirectories)
+            |> Seq.map (fun file -> 
+                            printfn "%s" file.Name ; processSiteWorks file.FullName) 
+            |> Seq.collect getOk
+    let table = new SiteWorksTable(okays)
+    use sw = new StreamWriter(path=outfile, append=false)
+    table.Save(writer = sw, separator = ',', quote = '\"')
+
+
+let main () : unit = 
+    let root = @"G:\work\Projects\rtu\Erskines\erskines-incoming"
+    Directory.GetDirectories(root) 
+        |> Array.iter (fun path -> processBatch (DirectoryInfo(path)))
+
+// Doodle below...
 
 
 let point : {| X:int; Y:int |} = {| X = 3; Y = 4 |}
@@ -86,3 +94,20 @@ let demo03 (number:int)  =
     let proc () = 
         findM (fun ix -> mreturn (ix = number)) [1;2;3;4;5]
     runDocumentExtractor sampleFile (proc ())
+
+let demo04 ()  = 
+    runDocumentExtractor sampleFile (body &>> extractSiteDetails)
+
+
+let demo05 (pattern:string)  = 
+    let proc () = 
+        body 
+            &>> findTable (tableCell 0 0 &>> cellInnerTextMatch pattern)
+            &>> tableInnerText
+    runDocumentExtractor sampleFile (proc ())
+
+let demo06 ()  = 
+    runDocumentExtractor sampleFile siteWorksExtractor
+
+
+    

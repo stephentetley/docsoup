@@ -38,6 +38,14 @@ module BodyExtractor =
             return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
 
+
+    let findTableIndex (predicate:TableExtractor<bool>) : BodyExtractor<int> = 
+        bodyExtractor { 
+            let! xs = tables |>> Seq.toList
+            return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
+        }
+
+
     let bodyInnerText : BodyExtractor<string> = 
         asks (fun body -> body.InnerText)
 
