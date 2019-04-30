@@ -6,6 +6,7 @@ namespace DocSoup
 [<RequireQualifiedAccess>]
 module Row = 
     
+    open System.Text
     open System.Text.RegularExpressions
 
     open DocumentFormat.OpenXml
@@ -14,7 +15,7 @@ module Row =
 
     type RowExtractorBuilder = ExtractMonadBuilder<Wordprocessing.TableRow> 
 
-    let (rowExtractor:RowExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableRow>()
+    let (extractor:RowExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableRow>()
 
     type Extractor<'a> = ExtractMonad<Wordprocessing.TableRow,'a> 
 
@@ -23,7 +24,7 @@ module Row =
         asks (fun row -> row.Elements<Wordprocessing.TableCell>())
 
     let cell (index:int) : Extractor<Wordprocessing.TableCell> = 
-        rowExtractor { 
+        extractor { 
             let! xs = cells
             return! liftOption (Seq.tryItem index xs)
         }
@@ -36,13 +37,13 @@ module Row =
 
 
     let findCell (predicate:Cell.Extractor<bool>) : Extractor<Wordprocessing.TableCell> = 
-        rowExtractor { 
+        extractor { 
             let! xs = cells |>> Seq.toList
             return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
 
     let findCellIndex (predicate:Cell.Extractor<bool>) : Extractor<int> = 
-        rowExtractor { 
+        extractor { 
             let! xs = cells |>> Seq.toList
             return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
         }
@@ -55,18 +56,72 @@ module Row =
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
-        rowExtractor { 
+        extractor { 
             let! inner = innerText 
             return Regex.IsMatch(inner, pattern)
         }
 
 
     let isMatch (cellPatterns:string []) : Extractor<bool> = 
-        rowExtractor { 
+        extractor { 
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
                 liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
             return! forallM (fun (patt,cel) -> local (fun _ -> cel) (Cell.isMatch patt)) pairs
         }
 
-    /// TODO - use regex groups for a function like rowIsMatch that returns matches
+    // TODO - use regex groups for a function like rowIsMatch that returns matches
+
+    /// Use with caution - a `RegularExpressions.Match` has not necessarily 
+    /// matched the input string. The `.Success` property may be false.
+    let regexMatch (cellPatterns:string []) : Extractor<RegularExpressions.Match []> = 
+        extractor { 
+            let! arrCells = cells |>> Seq.toArray
+            let! pairs = 
+                liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
+            return! mapM (fun (patt,cell1) -> focus cell1 (Cell.regexMatch patt)) pairs |>> List.toArray
+        }
+
+
+    /// Prefer this to `regexMatch` if you are expecting an array 
+    /// of successful matches and you don't need to inspect the result
+    /// (e.g. for a match group).
+    let regexMatchValues (cellPatterns:string []) : Extractor<string []> = 
+        extractor { 
+            let! arrCells = cells |>> Seq.toArray
+            let! pairs = 
+                liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
+            return! mapM (fun (patt,cel) -> local (fun _ -> cel) (Cell.regexMatchValue patt)) pairs |>> List.toArray
+        }
+
+    /// Parse a two column row with "name" in the first cell and 
+    /// "value" in the second cell.
+    let nameValue1Row (namePattern:string) : Extractor<string> = 
+        extractor { 
+            let! arr = regexMatchValues [| namePattern; ".*" |]
+            let! ans = liftAction "nameValue1Row - bad index" (fun _ -> arr.[1])
+            return ans
+        }
+
+    /// Parse a three column row with "name" in the first cell and 
+    /// "value1" and "value2" in the second and third cells.
+    let nameValue2Row (namePattern:string) : Extractor<string * string> = 
+        extractor { 
+            let! arr = regexMatchValues [| namePattern; ".*"; ".*" |]
+            let! ans1 = liftAction "nameValue2Row - bad index" (fun _ -> arr.[1])
+            let! ans2 = liftAction "nameValue2Row - bad index" (fun _ -> arr.[2])
+            return (ans1, ans2)
+        }
+
+    /// Parse a four column row with "name" in the first cell and 
+    /// "value1", "value2" and "value3" in the second, third and fourth cells.
+    let nameValue3Row (namePattern:string) : Extractor<string * string * string> = 
+        extractor { 
+            let! arr = regexMatchValues [| namePattern; ".*"; ".*" ; ".*" |]
+            let! ans1 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[1])
+            let! ans2 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[2])
+            let! ans3 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[3])
+            return (ans1, ans2, ans3)
+        }
+
+    /// TODO - nameValuesRow (namePattern:string) : Extractor<string []> 

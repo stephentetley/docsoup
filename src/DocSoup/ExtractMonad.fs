@@ -17,6 +17,8 @@ module ExtractMonad =
 
     type Answer<'a> = Result<'a, ErrMsg>
 
+
+    // To consider - maybe regex search options should go in the monad?
     type ExtractMonad<'handle, 'a> = 
         ExtractMonad of ('handle -> Answer<'a>)
         
@@ -98,12 +100,15 @@ module ExtractMonad =
         ExtractMonad <| fun handle -> 
             Ok (project handle)
 
-    let local (focus:'handle1 -> 'handle2) 
+    let local (adaptor:'handle1 -> 'handle2) 
               (ma:ExtractMonad<'handle2,'a>) : ExtractMonad<'handle1,'a> = 
         ExtractMonad <| fun handle -> 
-            apply1 ma (focus handle)
+            apply1 ma (adaptor handle)
 
-
+    let focus (newFocus:'handle2) 
+              (ma:ExtractMonad<'handle2,'a>) : ExtractMonad<'handle1,'a> = 
+        ExtractMonad <| fun _ -> 
+            apply1 ma newFocus
 
     /// Chain a _selector_ and an _extractor_.
     let ( &>> ) (focus:ExtractMonad<'handle1, 'handle2>)
@@ -516,3 +521,18 @@ module ExtractMonad =
                     | Ok false -> cont false
                     | Error msg -> cont false
             work items (fun ans -> Ok ans)
+
+    /// Note we have "natural failure" in the ExtractMonad so 
+    /// pickM does not have to return an Option.
+    let pickM (chooser:'a -> ExtractMonad<'handle,'b>)
+              (items:'a list) : ExtractMonad<'handle, 'b> = 
+        ExtractMonad <| fun handle -> 
+            let rec work xs fk sk = 
+                match xs with
+                | [] -> fk "pickM not found"
+                | item :: rest -> 
+                    match apply1 (chooser item) handle with
+                    | Ok ans -> sk ans
+                    | Error _ -> work rest fk sk
+            work items (fun msg -> Error msg) (fun ans -> Ok ans)
+

@@ -6,6 +6,7 @@ namespace DocSoup
 [<RequireQualifiedAccess>]
 module Cell = 
     
+    open System.Text
     open System.Text.RegularExpressions
 
     open DocumentFormat.OpenXml
@@ -46,3 +47,27 @@ module Cell =
     let isMatch (pattern:string) : Extractor<bool> = 
         paragraphsTextIsMatch pattern
 
+
+    let paragraphsTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        extractor { 
+            let! inner = paragraphsText 
+            return Regex.Match(input = inner, pattern = pattern)
+        }
+
+    let paragraphsTextMatchValue (pattern:string) : Extractor<string> = 
+        extractor { 
+            let! matchObj = paragraphsTextMatch pattern 
+            if matchObj.Success then
+                return matchObj.Value
+            else
+                return! throwError "no match"
+        }
+
+
+
+
+    let regexMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        paragraphsTextMatch pattern
+
+    let regexMatchValue (pattern:string) : Extractor<string> = 
+        paragraphsTextMatchValue pattern

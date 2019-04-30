@@ -4,15 +4,12 @@
 #r "netstandard"
 #r "System.IO.FileSystem.Primitives"
 
-
+open System.Text.RegularExpressions
 
 #I @"C:\Users\stephen\.nuget\packages\DocumentFormat.OpenXml\2.9.1\lib\netstandard1.3"
 #r "DocumentFormat.OpenXml"
 #I @"C:\Users\stephen\.nuget\packages\system.io.packaging\4.5.0\lib\netstandard1.3"
 #r "System.IO.Packaging"
-open DocumentFormat.OpenXml.Packaging
-open DocumentFormat.OpenXml.Wordprocessing
-
 
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
@@ -57,7 +54,24 @@ let demo05b () : Answer<string> =
     Document.runExtractor testDoc (Document.body &>> Body.table 0 &>> Table.cell (14,0) &>> Cell.paragraphsText)
 
 
+
 let dummy1 () = 
     List.forall (fun x -> x % 2 = 0) [2;4;6]
 
+let dummy1a () = 
+    List.pick (fun x -> if x > 7 then Some (x.ToString()) else None) [4;5;6;7;8]
 
+
+let dummy2 () = 
+    let answer = Regex.Match(input = "All the names", pattern = "(?<line1>.*)")
+    if answer.Success then
+        answer.Groups.["line1"].Value |> Ok
+    else
+        Error "bah"
+
+let dummy2a () = 
+    let answer = Regex.Match(input = "All the names", pattern = ".*")
+    if answer.Success then
+        answer.Value |> Ok
+    else
+        Error "bah"

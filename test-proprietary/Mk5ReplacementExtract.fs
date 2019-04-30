@@ -11,8 +11,8 @@ open DocSoup
 
 let extractSiteInfo : Body.Extractor< {| Name: string; SAI: string |} > = 
     Body.findTable (Table.firstRow  &>> Row.isMatch [| "Site Information" |]) 
-        &>> pipeM2 (Table.cell (1,1) &>> Cell.paragraphsText)
-                   (Table.cell (2,1) &>> Cell.paragraphsText)
+        &>> pipeM2 (Table.findNameValue1Row "Site Name")
+                   (Table.findNameValue1Row "SAI Number")
                    (fun name sai -> {| Name = name; SAI = sai |})
 
 
