@@ -35,14 +35,14 @@ module Body =
     let findTable (predicate:Table.Extractor<bool>) : Extractor<Wordprocessing.Table> = 
         extractor { 
             let! xs = tables |>> Seq.toList
-            return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
+            return! findM (fun table1 -> focus table1 predicate) xs
         }
 
 
     let findTableIndex (predicate:Table.Extractor<bool>) : Extractor<int> = 
         extractor { 
             let! xs = tables |>> Seq.toList
-            return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
+            return! findIndexM (fun table1 -> focus table1 predicate) xs
         }
 
 

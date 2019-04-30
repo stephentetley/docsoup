@@ -34,7 +34,8 @@ module Table =
 
     let cell (rowIndex:int, columnIndex:int) : Extractor<Wordprocessing.TableCell> = 
         extractor { 
-            let! xs = row rowIndex |>> fun r1 -> r1.Elements<Wordprocessing.TableCell>()
+            let! xs = row rowIndex 
+                        |>> fun row1 -> row1.Elements<Wordprocessing.TableCell>()
             return! liftOption (Seq.tryItem columnIndex xs)
         }
 
@@ -46,13 +47,13 @@ module Table =
     let findRow (predicate:Row.Extractor<bool>) : Extractor<Wordprocessing.TableRow> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
+            return! findM (fun row1 -> focus row1 predicate) xs
         }
 
     let findRowIndex (predicate:Row.Extractor<bool>) : Extractor<int> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
+            return! findIndexM (fun row1 -> focus row1 predicate) xs
         }
 
 
@@ -69,21 +70,21 @@ module Table =
             return Regex.IsMatch(inner, pattern)
         }
 
-
+    /// Maybe rename to findNameValue1 ?
     let findNameValue1Row (namePattern:string) : Extractor<string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! pickM (fun r1 -> (mreturn r1) &>> Row.nameValue1Row namePattern) xs
+            return! pickM (fun row1 -> focus row1 <| Row.nameValue1Row namePattern) xs
         }
 
     let findNameValue2Row (namePattern:string) : Extractor<string * string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! pickM (fun r1 -> (mreturn r1) &>> Row.nameValue2Row namePattern) xs
+            return! pickM (fun row1 -> focus row1 <| Row.nameValue2Row namePattern) xs
         }
         
     let findNameValue3Row (namePattern:string) : Extractor<string * string * string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! pickM (fun r1 -> (mreturn r1) &>> Row.nameValue3Row namePattern) xs
+            return! pickM (fun row1 -> focus row1 <| Row.nameValue3Row namePattern) xs
         }

@@ -39,13 +39,13 @@ module Row =
     let findCell (predicate:Cell.Extractor<bool>) : Extractor<Wordprocessing.TableCell> = 
         extractor { 
             let! xs = cells |>> Seq.toList
-            return! findM (fun t1 -> (mreturn t1) &>> predicate) xs
+            return! findM (fun cell1 -> focus cell1 predicate) xs
         }
 
     let findCellIndex (predicate:Cell.Extractor<bool>) : Extractor<int> = 
         extractor { 
             let! xs = cells |>> Seq.toList
-            return! findIndexM (fun t1 -> (mreturn t1) &>> predicate) xs
+            return! findIndexM (fun cell1 -> focus cell1 predicate) xs
         }
 
     let innerText : Extractor<string> = 
@@ -67,7 +67,7 @@ module Row =
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
                 liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
-            return! forallM (fun (patt,cel) -> local (fun _ -> cel) (Cell.isMatch patt)) pairs
+            return! forallM (fun (patt,cell1) -> focus cell1 (Cell.isMatch patt)) pairs
         }
 
     // TODO - use regex groups for a function like rowIsMatch that returns matches
@@ -91,7 +91,8 @@ module Row =
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
                 liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
-            return! mapM (fun (patt,cel) -> local (fun _ -> cel) (Cell.regexMatchValue patt)) pairs |>> List.toArray
+            return! mapM (fun (patt,cell1) -> 
+                            focus cell1 (Cell.regexMatchValue patt)) pairs |>> List.toArray
         }
 
     /// Parse a two column row with "name" in the first cell and 
