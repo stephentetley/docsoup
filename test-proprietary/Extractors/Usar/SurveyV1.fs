@@ -15,7 +15,7 @@ module SurveyV1 =
                                              ; ProcessArea: string 
                                              ; AssetReference: string |} > = 
         let tableMarkers = [| "Site" ; "Process Application"; "Site Area" |]
-        ignoreCase <| Body.findTable (Table.innerTextAllMatch tableMarkers ) 
+        ignoreCase <| Body.findTable (Table.spacedText &>> Text.allMatch tableMarkers ) 
             &>> pipeM4 (Table.innerText)
                        (mreturn "TODO")
                        (mreturn "TODO")
