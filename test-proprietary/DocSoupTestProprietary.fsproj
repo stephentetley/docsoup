@@ -5,12 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="PBCommissioningForm.fs" />
-    <Compile Include="ErskineBatteryExtract.fs" />
-    <Compile Include="Mk5ReplacementExtract.fs" />
+    <Compile Include="Extractors/PBCommissioningForm.fs" />
+    <Compile Include="Extractors/ErskineBatteryForm.fs" />
+    <Compile Include="Extractors/Mk5ReplacementForm.fs" />
+    <Compile Include="Extractors/UsarSurvey.fs" />
     <None Include="PBRun.fsx" />
     <None Include="ErskineBatteriesRun.fsx" />
     <None Include="Mk5Run.fsx" />
+    <None Include="UsarSurveysRun.fsx" />
   </ItemGroup>
 
   <ItemGroup>

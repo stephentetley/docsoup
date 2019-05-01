@@ -6,7 +6,6 @@
 #r "System.IO.FileSystem.Primitives"
 
 open System.IO
-open System.Text.RegularExpressions
 
 #I @"C:\Users\stephen\.nuget\packages\DocumentFormat.OpenXml\2.9.1\lib\netstandard1.3"
 #r "DocumentFormat.OpenXml"
@@ -31,8 +30,8 @@ open FSharp.Data
 #load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
-#load @"Mk5ReplacementExtract.fs"
-open Mk5ReplacementExtract
+#load @"Extractors\Mk5ReplacementForm.fs"
+open Extractors.Mk5ReplacementForm
 
 
 let localFile (fileName:string) : string = 

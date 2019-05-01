@@ -31,8 +31,8 @@ open FSharp.Data
 #load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
-#load @"PBCommissioningForm.fs"
-open PBCommissioningForm
+#load @"Extractors\PBCommissioningForm.fs"
+open Extractors.PBCommissioningForm
 
 
 let localFile (fileName:string) : string = 

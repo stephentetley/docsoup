@@ -31,8 +31,8 @@ open FSharp.Data
 #load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
-#load @"ErskineBatteryExtract.fs"
-open ErskineBatteryExtract
+#load @"Extractors\ErskineBatteryForm.fs"
+open Extractors.ErskineBatteryForm
 
 
 let localFile (fileName:string) : string = 

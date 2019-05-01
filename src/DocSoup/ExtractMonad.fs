@@ -83,7 +83,7 @@ module ExtractMonad =
     // ****************************************************
     // Errors
 
-    let throwError (msg:string) : ExtractMonad<'handle,'a> = 
+    let extractError (msg:string) : ExtractMonad<'handle,'a> = 
         ExtractMonad <| fun _  -> Error msg
 
     let swapError (msg:string) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'a> = 
@@ -92,6 +92,19 @@ module ExtractMonad =
             | Error _ -> Error msg
             | Ok a -> Ok a
 
+
+    // ****************************************************
+    // Bind operations
+
+    /// Bind operator
+    let ( >>= ) (ma:ExtractMonad<'handle,'a>) 
+              (fn:'a -> ExtractMonad<'handle,'b>) : ExtractMonad<'handle,'b> = 
+        bindM ma fn
+
+    /// Flipped Bind operator
+    let ( =<< ) (fn:'a -> ExtractMonad<'handle,'b>) 
+              (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
+        bindM ma fn
 
     // ****************************************************
     // Focus
@@ -111,26 +124,21 @@ module ExtractMonad =
             apply1 ma newFocus
 
     /// Chain a _selector_ and an _extractor_.
-    let ( &>> ) (focus:ExtractMonad<'handle1, 'handle2>)
+    let focusM (selector:ExtractMonad<'handle1, 'handle2>)
+               (ma:ExtractMonad<'handle2,'ans>) : ExtractMonad<'handle1,'ans> = 
+        selector >>= fun newHandle -> 
+        focus newHandle ma
+
+    /// Operator for focusM.
+    /// Chain a _selector_ and an _extractor_.
+    let ( &>> ) (selector:ExtractMonad<'handle1, 'handle2>)
                 (ma:ExtractMonad<'handle2,'ans>) : ExtractMonad<'handle1,'ans> = 
-        bindM focus <| fun h1 -> local (fun _ -> h1) ma
+        focusM selector ma
 
 
 
     // ****************************************************
     // Monadic operations
-
-    /// Bind operator
-    let ( >>= ) (ma:ExtractMonad<'handle,'a>) 
-              (fn:'a -> ExtractMonad<'handle,'b>) : ExtractMonad<'handle,'b> = 
-        bindM ma fn
-
-    /// Flipped Bind operator
-    let ( =<< ) (fn:'a -> ExtractMonad<'handle,'b>) 
-              (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
-        bindM ma fn
-
-
 
 
     /// fmap 
@@ -148,6 +156,7 @@ module ExtractMonad =
     let ( <<| ) (fn:'a -> 'b) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
         fmapM fn ma
 
+    /// Perform an action, but ignore its answer.
     let ignoreM (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, unit> = 
         ma |>> fun _ -> ()
 
@@ -156,11 +165,14 @@ module ExtractMonad =
             match apply1 cond handle with
             | Ok true -> Ok ()
             | _ -> Error failMsg
-            
+
+    /// Lift an option value.
+    /// Some ans becomes a success value in the ExtractMonad.
+    /// None throws a monadic error (not system system exception). 
     let liftOption (opt:'a option) : ExtractMonad<'handle, 'a> = 
         match opt with
         | Some a -> mreturn a
-        | None -> throwError "liftOption - None"
+        | None -> extractError "liftOption - None"
 
     /// Lift an action that may fail (e.g. an IO operation).
     /// If the action does fail, replace the hard error with 
@@ -170,7 +182,7 @@ module ExtractMonad =
             let ans = action ()
             mreturn ans
         with
-        | _ -> throwError errMsg
+        | _ -> extractError errMsg
 
 
     // liftM (which is fmap)

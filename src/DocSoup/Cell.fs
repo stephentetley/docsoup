@@ -60,7 +60,7 @@ module Cell =
             if matchObj.Success then
                 return matchObj.Value
             else
-                return! throwError "no match"
+                return! extractError "no match"
         }
 
 
