@@ -30,6 +30,13 @@ module Paragraph =
     let textIsMatch (pattern:string) : Extractor<bool> = 
         genRegexIsMatch (fun _ -> innerText) pattern
 
+
+    /// This function matches the regex pattern to the 'inner text'
+    /// of the cell.
+    let textIsNotMatch (pattern:string) : Extractor<bool> = 
+        textIsMatch pattern |>> not
+
+
     /// This function matches the regex pattern to the 'inner text'
     /// of the cell.
     let textMatch (pattern:string) : Extractor<RegularExpressions.Match> = 

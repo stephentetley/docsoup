@@ -72,6 +72,12 @@ module Cell =
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
         genRegexIsMatch (fun _ -> innerText) pattern
 
+    /// This function matches the regex pattern to the 'inner text'
+    /// of the cell.
+    let innerTextIsNotMatch (pattern:string) : Extractor<bool> = 
+        innerTextIsMatch pattern |>> not
+
+
     let innerTextMatchValue (pattern:string) : Extractor<string> = 
         genRegexMatchValue (fun _ -> innerText) pattern
 
@@ -86,6 +92,10 @@ module Cell =
 
     let spacedTextIsMatch (pattern:string) : Extractor<bool> = 
         genRegexIsMatch (fun _ -> spacedText) pattern
+
+    let spacedTextIsNotMatch (pattern:string) : Extractor<bool> = 
+        spacedTextIsMatch pattern |>> not
+
 
     let spacedTextMatchValue (pattern:string) : Extractor<string> = 
         genRegexMatchValue (fun _ -> spacedText) pattern

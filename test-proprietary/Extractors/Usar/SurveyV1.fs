@@ -14,11 +14,12 @@ module SurveyV1 =
                                              ; SensorName: string
                                              ; ProcessArea: string 
                                              ; AssetReference: string |} > = 
-        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.isMatch "Site Name") 
-            &>> pipeM4 (Table.findNameValue2Row "Site Name")
-                       (Table.findNameValue2Row "Sensor name")
-                       (Table.findNameValue2Row "Process area")
-                       (Table.findNameValue2Row "Asset Reference")
+        let tableMarkers = [| "Site" ; "Process Application"; "Site Area" |]
+        ignoreCase <| Body.findTable (Table.innerTextAllMatch tableMarkers ) 
+            &>> pipeM4 (Table.innerText)
+                       (mreturn "TODO")
+                       (mreturn "TODO")
+                       (mreturn "{no asset reference}")
                        (fun siteName sensorName processArea reference -> 
                             {| SiteName = siteName
                              ; SensorName = sensorName

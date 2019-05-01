@@ -32,6 +32,7 @@ open FSharp.Data
 open DocSoup
 
 #load @"Extractors\Usar\Schema.fs"
+#load @"Extractors\Usar\SurveyV1.fs"
 #load @"Extractors\Usar\SurveyV2.fs"
 open Extractors.Usar
 
@@ -70,6 +71,7 @@ let dummy01 () =
     Document.runExtractor v1Sample 
         (Document.body &>> Body.table 0 &>> Table.firstCell &>> Cell.spacedText)
 
-let dummy02 () : Answer<bool> = 
-    Document.runExtractor v1Sample (mreturn true <&&> mreturn true)
+let dummy02 ()  = 
+    Document.runExtractor v1Sample 
+            (Document.body &>> SurveyV1.extractSurveyInfo)
 

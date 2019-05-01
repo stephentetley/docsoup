@@ -629,6 +629,7 @@ module ExtractMonad =
                                  , options = regexOpts ))
 
 
+
     let internal genRegexMatch (getInput: unit -> ExtractMonad<'handle, string>) 
                                (pattern:string) : ExtractMonad<'handle, Match> = 
         pipeM2 (getInput ())  
