@@ -24,9 +24,11 @@ module Cell =
         asks (fun cell -> cell.InnerText)
 
     /// Get the cell "Paragraphs text" which should preserves newline.
-    /// Currently doesn't seem to...
     let paragraphsText : Extractor<string> = 
-        asks (fun cell -> cell.Elements<Wordprocessing.Paragraph>() |> Seq.map (fun text -> text.InnerText)  |> Common.fromLines)
+        extractor { 
+            let! paras = asks (fun cell -> cell.Elements<Wordprocessing.Paragraph>())
+            return paras |> Seq.map (fun para -> para.InnerText) |> Common.fromLines
+        }
         
     /// This function matches the regex pattern to the 'inner text'
     /// of the cell.

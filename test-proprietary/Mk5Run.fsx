@@ -35,7 +35,7 @@ open Extractors.Mk5ReplacementForm
 
 
 let localFile (fileName:string) : string = 
-    System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
+    System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data/output", fileName)
 
 
 let getOk (ans:Result<'a, ErrMsg>) : seq<'a> = 

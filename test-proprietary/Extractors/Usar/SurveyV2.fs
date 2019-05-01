@@ -36,7 +36,7 @@ module SurveyV2 =
 
 
 
-    let usarSurveyExtractor : Document.Extractor<UsarSurveyRow> = 
+    let usarSurveyV2Extractor : Document.Extractor<UsarSurveyRow> = 
         Document.body 
             &>> pipeM2 extractSurveyInfo 
                         extractVisitInfo
@@ -49,5 +49,5 @@ module SurveyV2 =
                                             , surveyDate = r2.SurveyDate
                                             ))
 
-    let processUsarSurvey (filePath:string) : Answer<UsarSurveyRow>  =
-        Document.runExtractor filePath usarSurveyExtractor
+    let processUsarSurveyV2 (filePath:string) : Answer<UsarSurveyRow>  =
+        Document.runExtractor filePath usarSurveyV2Extractor

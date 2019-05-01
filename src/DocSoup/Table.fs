@@ -11,6 +11,7 @@ module Table =
     open DocumentFormat.OpenXml
 
     open DocSoup
+    open DocSoup.Internal
 
     type TableExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Table> 
 
@@ -30,6 +31,15 @@ module Table =
         }
 
     let rowCount : Extractor<int> = rows |>> Seq.length
+
+    /// Get the structure of a table which is an array 
+    /// of column counts for each row.
+    let structure : Extractor<int []> = 
+        extractor { 
+            let! xs = rows |>> Seq.toList
+            let! counts = mapM (fun row1 -> focus row1 Row.cellCount) xs
+            return counts |> List.toArray
+        }
 
 
     let cell (rowIndex:int, columnIndex:int) : Extractor<Wordprocessing.TableCell> = 
@@ -60,6 +70,18 @@ module Table =
     let innerText : Extractor<string> = 
         asks (fun table -> table.InnerText)
 
+    /// Get the row "Paragraphs text" which should preserves newline.
+    let rowsParagraphsText : Extractor<string []> = 
+        extractor { 
+            let! rowList = rows |>> Seq.toList
+            let! texts = mapM (fun row1 -> focus row1 Row.paragraphsText) rowList
+            return texts |> List.toArray
+        }
+
+    let paragraphsText : Extractor<string> = 
+        rowsParagraphsText |>> Common.fromLines
+
+
     /// This function matches the regex pattern to the 'inner text'
     /// of the table.
     /// The inner text does not preserve whitespace, so **do not**
@@ -79,7 +101,7 @@ module Table =
     let findNameValue2Row (namePattern:string) : Extractor<string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! pickM (fun row1 -> focus row1 <| Row.nameValue1Row namePattern) xs
+            return! pickM (fun row1 -> focus row1 <| Row.nameValue2Row namePattern) xs
         }
 
     /// Find the string values in a three cell row.
@@ -89,7 +111,7 @@ module Table =
     let findNameValue3Row (namePattern:string) : Extractor<string * string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! pickM (fun row1 -> focus row1 <| Row.nameValue2Row namePattern) xs
+            return! pickM (fun row1 -> focus row1 <| Row.nameValue3Row namePattern) xs
         }
         
 
@@ -101,5 +123,5 @@ module Table =
     let findNameValue4Row (namePattern:string) : Extractor<string * string * string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
-            return! pickM (fun row1 -> focus row1 <| Row.nameValue3Row namePattern) xs
+            return! pickM (fun row1 -> focus row1 <| Row.nameValue4Row namePattern) xs
         }

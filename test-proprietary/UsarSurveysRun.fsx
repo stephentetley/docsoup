@@ -35,9 +35,8 @@ open DocSoup
 open Extractors.Usar
 open Extractors.Usar.SurveyV2
 
-
 let localFile (fileName:string) : string = 
-    System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
+    System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data/output", fileName)
 
 
 let getOk (ans:Result<'a, ErrMsg>) : seq<'a> = 
@@ -51,7 +50,7 @@ let processBatch (info:DirectoryInfo) : unit =
     let okays = 
         System.IO.DirectoryInfo(info.FullName).GetFiles(searchPattern = "*Survey*.docx", searchOption = SearchOption.AllDirectories)
             |> Seq.map (fun file -> 
-                            printfn "%s" file.Name ; processUsarSurvey file.FullName) 
+                            printfn "%s" file.Name ; processUsarSurveyV2 file.FullName) 
             |> Seq.collect getOk
     let table = new UsarSurveyTable(okays)
     use sw = new StreamWriter(path=outfile, append=false)
@@ -63,3 +62,10 @@ let sourceDirectory = @"G:\work\Projects\usar\small-stw\Incoming"
 let main () : unit = 
     Directory.GetDirectories(sourceDirectory) 
         |> Array.iter (fun path -> processBatch (DirectoryInfo(path)))
+
+let v1Sample = @"G:\work\Projects\usar\SAMPLE V1 Survey.docx"
+
+let dummy01 () = 
+    Document.runExtractor v1Sample 
+        (Document.body &>> Body.table 0 &>> Table.firstCell &>> Cell.paragraphsText)
+

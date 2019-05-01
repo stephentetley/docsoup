@@ -12,6 +12,7 @@ module Row =
     open DocumentFormat.OpenXml
 
     open DocSoup
+    open DocSoup.Internal
 
     type RowExtractorBuilder = ExtractMonadBuilder<Wordprocessing.TableRow> 
 
@@ -50,6 +51,18 @@ module Row =
 
     let innerText : Extractor<string> = 
         asks (fun row -> row.InnerText)
+
+
+    /// Get the cell "Paragraphs text" which should preserves newline.
+    let cellsParagraphsText : Extractor<string []> = 
+        extractor { 
+            let! cellList = cells |>> Seq.toList
+            let! texts = mapM (fun cell1 -> focus cell1 Cell.paragraphsText) cellList
+            return texts |> List.toArray
+        }
+
+    let paragraphsText : Extractor<string> = 
+        cellsParagraphsText |>> Common.fromLines
 
     /// This function matches the regex pattern to the 'inner text'
     /// of the row.
@@ -100,7 +113,7 @@ module Row =
 
     /// Parse a two column row with "name" in the first cell and 
     /// "value" in the second cell.
-    let nameValue1Row (namePattern:string) : Extractor<string> = 
+    let nameValue2Row (namePattern:string) : Extractor<string> = 
         extractor { 
             let! arr = regexMatchValues [| namePattern; ".*" |]
             let! ans = liftAction "nameValue1Row - bad index" (fun _ -> arr.[1])
@@ -109,7 +122,7 @@ module Row =
 
     /// Parse a three column row with "name" in the first cell and 
     /// "value1" and "value2" in the second and third cells.
-    let nameValue2Row (namePattern:string) : Extractor<string * string> = 
+    let nameValue3Row (namePattern:string) : Extractor<string * string> = 
         extractor { 
             let! arr = regexMatchValues [| namePattern; ".*"; ".*" |]
             let! ans1 = liftAction "nameValue2Row - bad index" (fun _ -> arr.[1])
@@ -119,7 +132,7 @@ module Row =
 
     /// Parse a four column row with "name" in the first cell and 
     /// "value1", "value2" and "value3" in the second, third and fourth cells.
-    let nameValue3Row (namePattern:string) : Extractor<string * string * string> = 
+    let nameValue4Row (namePattern:string) : Extractor<string * string * string> = 
         extractor { 
             let! arr = regexMatchValues [| namePattern; ".*"; ".*" ; ".*" |]
             let! ans1 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[1])

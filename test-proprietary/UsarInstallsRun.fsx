@@ -38,7 +38,7 @@ open Extractors.Usar.InstallV2
 
 
 let localFile (fileName:string) : string = 
-    System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
+    System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data/output", fileName)
 
 
 let getOk (ans:Result<'a, ErrMsg>) : seq<'a> = 
