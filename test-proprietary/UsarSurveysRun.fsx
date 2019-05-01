@@ -67,5 +67,5 @@ let v1Sample = @"G:\work\Projects\usar\SAMPLE V1 Survey.docx"
 
 let dummy01 () = 
     Document.runExtractor v1Sample 
-        (Document.body &>> Body.table 0 &>> Table.firstCell &>> Cell.paragraphsText)
+        (Document.body &>> Body.table 0 &>> Table.firstCell &>> Cell.spacedText)
 

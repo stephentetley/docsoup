@@ -71,15 +71,15 @@ module Table =
         asks (fun table -> table.InnerText)
 
     /// Get the row "Paragraphs text" which should preserves newline.
-    let rowsParagraphsText : Extractor<string []> = 
+    let rowsSpacedText : Extractor<string []> = 
         extractor { 
             let! rowList = rows |>> Seq.toList
-            let! texts = mapM (fun row1 -> focus row1 Row.paragraphsText) rowList
+            let! texts = mapM (fun row1 -> focus row1 Row.spacedText) rowList
             return texts |> List.toArray
         }
 
-    let paragraphsText : Extractor<string> = 
-        rowsParagraphsText |>> Common.fromLines
+    let spacedText : Extractor<string> = 
+        rowsSpacedText |>> Common.fromLines
 
 
     /// This function matches the regex pattern to the 'inner text'

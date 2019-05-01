@@ -23,6 +23,13 @@ module Body =
         asks (fun body -> body.OfType<Wordprocessing.Paragraph>())
 
 
+    let paragraph (index:int) : Extractor<Wordprocessing.Paragraph> = 
+        extractor { 
+            let! xs = paragraphs
+            return! liftOption (Seq.tryItem index xs)
+        }
+
+
     let tables : Extractor<seq<Wordprocessing.Table>> = 
         asks (fun body -> body.OfType<Wordprocessing.Table>())
 

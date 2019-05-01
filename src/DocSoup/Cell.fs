@@ -24,10 +24,23 @@ module Cell =
         asks (fun cell -> cell.InnerText)
 
     /// Get the cell "Paragraphs text" which should preserves newline.
-    let paragraphsText : Extractor<string> = 
+    let paragraphs : Extractor<seq<Wordprocessing.Paragraph>> = 
+        asks (fun cell -> cell.Elements<Wordprocessing.Paragraph>())
+
+
+    let paragraph (index:int) : Extractor<Wordprocessing.Paragraph> = 
+        extractor { 
+            let! xs = paragraphs
+            return! liftOption (Seq.tryItem index xs)
+        }
+
+    /// Get the cell "Paragraphs text" which should preserves newline.
+    let spacedText : Extractor<string> = 
         extractor { 
             let! paras = asks (fun cell -> cell.Elements<Wordprocessing.Paragraph>())
-            return paras |> Seq.map (fun para -> para.InnerText) |> Common.fromLines
+            return paras 
+                |> Seq.map (fun para1 -> para1.InnerText) 
+                |> Common.fromLines
         }
         
     /// This function matches the regex pattern to the 'inner text'
@@ -43,9 +56,9 @@ module Cell =
                                 , options = regexOpts )
         }
 
-    let paragraphsTextIsMatch (pattern:string) : Extractor<bool> = 
+    let spacedTextIsMatch (pattern:string) : Extractor<bool> = 
         extractor { 
-            let! inner = paragraphsText 
+            let! inner = spacedText 
             let! regexOpts = getRegexOptions ()
             return Regex.IsMatch( input = inner
                                 , pattern = pattern
@@ -53,21 +66,21 @@ module Cell =
         }
 
     let isMatch (pattern:string) : Extractor<bool> = 
-        paragraphsTextIsMatch pattern
+        spacedTextIsMatch pattern
 
 
-    let paragraphsTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+    let spacedTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
         extractor { 
-            let! inner = paragraphsText 
+            let! inner = spacedText 
             let! regexOpts = getRegexOptions ()
             return Regex.Match( input = inner
                               , pattern = pattern
                               , options = regexOpts )
         }
 
-    let paragraphsTextMatchValue (pattern:string) : Extractor<string> = 
+    let spacedTextMatchValue (pattern:string) : Extractor<string> = 
         extractor { 
-            let! matchObj = paragraphsTextMatch pattern 
+            let! matchObj = spacedTextMatch pattern 
             if matchObj.Success then
                 return matchObj.Value
             else
@@ -78,7 +91,7 @@ module Cell =
 
 
     let regexMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
-        paragraphsTextMatch pattern
+        spacedTextMatch pattern
 
     let regexMatchValue (pattern:string) : Extractor<string> = 
-        paragraphsTextMatchValue pattern
+        spacedTextMatchValue pattern

@@ -53,16 +53,16 @@ module Row =
         asks (fun row -> row.InnerText)
 
 
-    /// Get the cell "Paragraphs text" which should preserves newline.
-    let cellsParagraphsText : Extractor<string []> = 
+    /// Get the cell "Spaced text" which should preserves newline.
+    let cellsSpacedText : Extractor<string []> = 
         extractor { 
             let! cellList = cells |>> Seq.toList
-            let! texts = mapM (fun cell1 -> focus cell1 Cell.paragraphsText) cellList
+            let! texts = mapM (fun cell1 -> focus cell1 Cell.spacedText) cellList
             return texts |> List.toArray
         }
 
-    let paragraphsText : Extractor<string> = 
-        cellsParagraphsText |>> Common.fromLines
+    let spacedText : Extractor<string> = 
+        cellsSpacedText |>> Common.fromLines
 
     /// This function matches the regex pattern to the 'inner text'
     /// of the row.
