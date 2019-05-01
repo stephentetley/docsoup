@@ -86,7 +86,7 @@ let dummy2 () =
 let demo02 (pattern:string)  = 
     let proc () = 
         Document.body 
-            &>> Body.findTable (Table.innerTextIsMatch pattern)
+            &>> Body.findTable (Table.innerText &>> Text.isMatch pattern)
             &>> Table.innerText
     Document.runExtractor sampleFile (proc ())
          
@@ -104,7 +104,7 @@ let demo04 ()  =
 let demo05 (pattern:string)  = 
     let proc () = 
         Document.body 
-            &>> Body.findTable (Table.cell (0,0) &>> Cell.innerTextIsMatch pattern)
+            &>> Body.findTable (Table.cell (0,0) &>> Cell.innerText &>> Text.isMatch pattern)
             &>> Table.innerText
     Document.runExtractor sampleFile (proc ())
 

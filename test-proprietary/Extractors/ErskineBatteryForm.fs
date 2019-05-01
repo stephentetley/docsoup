@@ -12,7 +12,7 @@ module ErskineBatteryForm =
     open DocSoup
 
     let extractSiteDetails : Body.Extractor< {| Name: string; SAI: string; Outstation: string |} > = 
-        Body.findTable (Table.innerTextIsMatch "Site Details") 
+        Body.findTable (Table.innerText &>> Text.isMatch "Site Details") 
             &>> pipeM3 (Table.cell (1,1) &>> Cell.spacedText)
                        (Table.cell (2,1) &>> Cell.spacedText)
                        (Table.cell (4,1) &>> Cell.spacedText)
@@ -23,7 +23,7 @@ module ErskineBatteryForm =
 
                                           
     let extractWorkDetails : Body.Extractor< {| Name: string; Date: string |} > = 
-        Body.findTable (Table.firstCell &>> Cell.innerTextIsMatch "Testing & Recording of Site Work")
+        Body.findTable (Table.firstCell &>> Cell.spacedText &>> Text.isMatch "Testing & Recording of Site Work")
             &>> pipeM2 (Table.cell (2,1) &>> Cell.spacedText)
                         (Table.cell (3,1) &>> Cell.spacedText)
                         (fun name date -> {| Name = name

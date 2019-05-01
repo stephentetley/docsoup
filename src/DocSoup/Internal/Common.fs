@@ -11,8 +11,8 @@ module Common =
 
 
     /// Splits on Environment.NewLine
-    let toLines (source:string) : seq<string> = 
-        source.Split(separator=[| Environment.NewLine |], options=StringSplitOptions.None) |> Array.toSeq
+    let toLines (source:string) : string [] = 
+        source.Split(separator=[| Environment.NewLine |], options=StringSplitOptions.None) 
 
     /// Joins with Environment.NewLine
     let fromLines (source:seq<string>) : string = 

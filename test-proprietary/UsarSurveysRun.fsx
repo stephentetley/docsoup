@@ -6,6 +6,7 @@
 #r "System.IO.FileSystem.Primitives"
 
 open System.IO
+open System.Text.RegularExpressions
 
 #I @"C:\Users\stephen\.nuget\packages\DocumentFormat.OpenXml\2.9.1\lib\netstandard1.3"
 #r "DocumentFormat.OpenXml"
@@ -75,4 +76,16 @@ let dummy01 () =
 let dummy02 ()  = 
     Document.runExtractor v1Sample 
             (Document.body &>> SurveyV1.extractSurveyInfo)
+
+let dummy03 () = 
+    let ans = Regex.Match(input = "one two three", pattern = "two")
+    if ans.Success then
+        ans.Index
+    else
+        failwith "Bad"
+
+let dummy04 () = 
+    runExtractMonad v1Sample (fun _ -> "one-two-three")
+        <| tupleM2 (Text.leftOfMatch "two") (Text.rightOfMatch "two")
+
 

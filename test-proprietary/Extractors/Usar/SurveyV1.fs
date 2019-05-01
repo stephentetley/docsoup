@@ -16,7 +16,7 @@ module SurveyV1 =
                                              ; AssetReference: string |} > = 
         let tableMarkers = [| "Site" ; "Process Application"; "Site Area" |]
         ignoreCase <| Body.findTable (Table.spacedText &>> Text.allMatch tableMarkers ) 
-            &>> pipeM4 (Table.innerText)
+            &>> pipeM4 (Table.spacedText)
                        (mreturn "TODO")
                        (mreturn "TODO")
                        (mreturn "{no asset reference}")
