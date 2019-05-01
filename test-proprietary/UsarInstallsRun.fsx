@@ -30,8 +30,11 @@ open FSharp.Data
 #load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
-#load @"Extractors\UsarInstall.fs"
-open Extractors.UsarInstall
+
+#load @"Extractors\Usar\Schema.fs"
+#load @"Extractors\Usar\InstallV2.fs"
+open Extractors.Usar
+open Extractors.Usar.InstallV2
 
 
 let localFile (fileName:string) : string = 
@@ -64,7 +67,7 @@ let processBatch (info:DirectoryInfo) : unit =
     table.Save(writer = sw, separator = ',', quote = '\"')
 
     
-let sourceDirectory = @"G:\work\Projects\usar\nswc\Installs"
+let sourceDirectory = @"G:\work\Projects\usar\small-stw\Incoming"
 
 let main () : unit = 
     Directory.GetDirectories(sourceDirectory) 

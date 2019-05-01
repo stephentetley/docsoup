@@ -1,18 +1,14 @@
 ﻿// Copyright (c) Stephen Tetley 2019
 // License: BSD 3 Clause
 
-namespace Extractors
+namespace Extractors.Usar
 
-module UsarInstall =
-
-    open System.IO
-
-    open FSharp.Data
+module SurveyV2 =
 
     open DocSoup
+    open Extractors.Usar.Schema
 
-
-    let extractGeneralInfo : Body.Extractor< {| SiteName: string
+    let extractSurveyInfo : Body.Extractor< {| SiteName: string
                                              ; SensorName: string
                                              ; ProcessArea: string 
                                              ; AssetReference: string |} > = 
@@ -29,41 +25,29 @@ module UsarInstall =
                             |})
 
     let extractVisitInfo : Body.Extractor< {| Engineer: string
-                                            ; InstallDate: string |} > = 
-        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.isMatch "Checked By") 
-            &>> pipeM2 (Table.findNameValue2Row "Checked By")
+                                             ; SurveyDate: string |} > = 
+        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.isMatch "Surveyed By") 
+            &>> pipeM2 (Table.findNameValue2Row "Surveyed By")
                        (Table.findNameValue2Row "Date")
-                       (fun engineer installDate -> 
+                       (fun engineer surveyDate -> 
                             {| Engineer = engineer
-                             ; InstallDate = installDate 
+                             ; SurveyDate = surveyDate 
                             |})
 
-    [<Literal>]
-    let OutputSchema = 
-        "Site Name(string), Sensor Name(string), " +
-        "Process Area(string), Asset Reference(string), " +
-        "Engineer(string), Install Date(string)"
-
-    type UsarInstallTable = 
-        CsvProvider< Sample = OutputSchema,
-                     Schema = OutputSchema,
-                     HasHeaders = true >
-
-    type UsarInstallRow = UsarInstallTable.Row
 
 
-    let usarInstallExtractor : Document.Extractor<UsarInstallRow> = 
+    let usarSurveyExtractor : Document.Extractor<UsarSurveyRow> = 
         Document.body 
-            &>> pipeM2 extractGeneralInfo 
+            &>> pipeM2 extractSurveyInfo 
                         extractVisitInfo
                         ( fun r1 r2 -> 
-                            UsarInstallRow  ( siteName = r1.SiteName
+                            UsarSurveyRow   ( siteName = r1.SiteName
                                             , sensorName = r1.SensorName
                                             , processArea = r1.ProcessArea
                                             , assetReference = r1.AssetReference
                                             , engineer = r2.Engineer
-                                            , installDate = r2.InstallDate
+                                            , surveyDate = r2.SurveyDate
                                             ))
 
-    let processUsarInstall (filePath:string) : Answer<UsarInstallRow>  =
-        Document.runExtractor filePath usarInstallExtractor
+    let processUsarSurvey (filePath:string) : Answer<UsarSurveyRow>  =
+        Document.runExtractor filePath usarSurveyExtractor
