@@ -20,8 +20,43 @@ module Text =
 
     let contents : Extractor<string> = asks (fun text -> text)
 
+    /// Caution - use with text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let lines : Extractor<string []> = contents |>> Common.toLines
 
-    let lines () : Extractor<string []> = contents |>> Common.toLines
+    /// Caution - use with text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let line (index:int) : Extractor<string> = 
+        extractor { 
+            let! xs = lines
+            return! liftOption (Seq.tryItem index xs)
+        }
+
+    /// Caution - use only on text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let lineCount : Extractor<int> =  
+        lines |>> Seq.length
+
+    /// Caution - use only on text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let firstLine : Extractor<string> = 
+        line 0 
+
+    /// Caution - use only on text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let findLine (predicate:Extractor<bool>) : Extractor<string> = 
+        extractor { 
+            let! xs = lines |>> Seq.toList
+            return! findM (fun line1 -> focus line1 predicate) xs
+        }
+
+    /// Caution - use only on text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let findLineIndex (predicate:Extractor<bool>) : Extractor<int> = 
+        extractor { 
+            let! xs = lines |>> Seq.toList
+            return! findIndexM (fun cell1 -> focus cell1 predicate) xs
+        }
 
     let subcontents (startIndex: int) (length:int) : Extractor<string> = 
         contents |>> fun str -> 
