@@ -67,23 +67,38 @@ module Table =
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
         extractor { 
             let! inner = innerText 
-            return Regex.IsMatch(inner, pattern)
+            let! regexOpts = getRegexOptions ()
+            return Regex.IsMatch( input = inner
+                                , pattern = pattern 
+                                , options = regexOpts )
         }
 
-    /// Maybe rename to findNameValue1 ?
-    let findNameValue1Row (namePattern:string) : Extractor<string> = 
+    /// Find the string value in a two cell row.
+    /// Cell 1 is considered the "name" field.
+    /// Cell 2 is "value".
+    let findNameValue2Row (namePattern:string) : Extractor<string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
             return! pickM (fun row1 -> focus row1 <| Row.nameValue1Row namePattern) xs
         }
 
-    let findNameValue2Row (namePattern:string) : Extractor<string * string> = 
+    /// Find the string values in a three cell row.
+    /// Cell 1 is considered the "name" field.
+    /// Cell 2 is "value 1".
+    /// Cell 3 is "value 2".
+    let findNameValue3Row (namePattern:string) : Extractor<string * string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
             return! pickM (fun row1 -> focus row1 <| Row.nameValue2Row namePattern) xs
         }
         
-    let findNameValue3Row (namePattern:string) : Extractor<string * string * string> = 
+
+    /// Find the string values in a four cell row.
+    /// Cell 1 is considered the "name" field.
+    /// Cell 2 is "value 1".
+    /// Cell 3 is "value 2".
+    /// Cell 4 is "value 3".
+    let findNameValue4Row (namePattern:string) : Extractor<string * string * string> = 
         extractor { 
             let! xs = rows |>> Seq.toList
             return! pickM (fun row1 -> focus row1 <| Row.nameValue3Row namePattern) xs

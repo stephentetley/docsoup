@@ -58,7 +58,10 @@ module Row =
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
         extractor { 
             let! inner = innerText 
-            return Regex.IsMatch(inner, pattern)
+            let! regexOpts = getRegexOptions ()
+            return Regex.IsMatch( input = inner
+                                , pattern = pattern
+                                , options = regexOpts )
         }
 
 

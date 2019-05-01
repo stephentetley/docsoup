@@ -20,34 +20,35 @@ module ExtractMonad =
 
     // To consider - maybe regex search options should go in the monad?
     type ExtractMonad<'handle, 'a> = 
-        ExtractMonad of ('handle -> Answer<'a>)
+        ExtractMonad of (RegexOptions -> 'handle -> Answer<'a>)
         
 
 
-    let inline private apply1 (ma: ExtractMonad<'handle, 'a>) 
+    let inline private apply1 (ma: ExtractMonad<'handle, 'a>)
+                              (options: RegexOptions)
                               (handle: 'handle) : Answer<'a>= 
-        let (ExtractMonad f) = ma in f handle
+        let (ExtractMonad f) = ma in f options handle
 
         
     let inline mreturn (x:'a) : ExtractMonad<'handle, 'a> = 
-        ExtractMonad <| fun _ -> Ok x
+        ExtractMonad <| fun _ _ -> Ok x
 
     let inline private bindM (ma:ExtractMonad<'handle, 'a>) 
         (f :'a -> ExtractMonad<'handle, 'b>) : ExtractMonad<'handle, 'b> =
-            ExtractMonad <| fun handle -> 
-                match apply1 ma handle with
+            ExtractMonad <| fun opts handle -> 
+                match apply1 ma opts handle with
                 | Error msg -> Error msg
-                | Ok a -> apply1 (f a) handle
+                | Ok a -> apply1 (f a) opts handle
 
     let inline private zeroM () : ExtractMonad<'handle,'a> = 
-        ExtractMonad <| fun _ -> Error "zeroM"
+        ExtractMonad <| fun _ _ -> Error "zeroM"
 
     /// "First success"
     let inline private combineM (ma:ExtractMonad<'handle,'a>) 
                                 (mb:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'a> = 
-        ExtractMonad <| fun handle -> 
-            match apply1 ma handle with
-            | Error msg -> apply1 mb handle
+        ExtractMonad <| fun opts handle -> 
+            match apply1 ma opts handle with
+            | Error msg -> apply1 mb opts handle
             | Ok a -> Ok a
 
     let inline private delayM (fn:unit -> ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'a> = 
@@ -71,11 +72,12 @@ module ExtractMonad =
     let runExtractMonad (filePath:string) 
                         (project:WordprocessingDocument -> 'handle)  
                         (ma:ExtractMonad<'handle,'a>) : Result<'a,ErrMsg> = 
+        let opts = RegexOptions.None
         if isWordTempFile filePath then 
             Error (sprintf "Invalid Word file: %s" filePath) 
         else
             match OpenXml.primitiveExtract filePath 
-                                           (fun doc -> apply1 ma (project doc)) with
+                                           (fun doc -> apply1 ma opts (project doc)) with
             | Error msg -> Error msg
             | Ok ans -> ans
 
@@ -84,11 +86,11 @@ module ExtractMonad =
     // Errors
 
     let extractError (msg:string) : ExtractMonad<'handle,'a> = 
-        ExtractMonad <| fun _  -> Error msg
+        ExtractMonad <| fun _ _ -> Error msg
 
     let swapError (msg:string) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'a> = 
-        ExtractMonad <| fun handle ->
-            match apply1 ma handle with
+        ExtractMonad <| fun opts handle ->
+            match apply1 ma opts handle with
             | Error _ -> Error msg
             | Ok a -> Ok a
 
@@ -110,18 +112,18 @@ module ExtractMonad =
     // Focus
 
     let asks (project:'handle -> 'a) : ExtractMonad<'handle,'a> = 
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun _ handle -> 
             Ok (project handle)
 
     let local (adaptor:'handle1 -> 'handle2) 
               (ma:ExtractMonad<'handle2,'a>) : ExtractMonad<'handle1,'a> = 
-        ExtractMonad <| fun handle -> 
-            apply1 ma (adaptor handle)
+        ExtractMonad <| fun opts handle -> 
+            apply1 ma opts (adaptor handle)
 
     let focus (newFocus:'handle2) 
               (ma:ExtractMonad<'handle2,'a>) : ExtractMonad<'handle1,'a> = 
-        ExtractMonad <| fun _ -> 
-            apply1 ma newFocus
+        ExtractMonad <| fun opts _ -> 
+            apply1 ma opts newFocus
 
     /// Chain a _selector_ and an _extractor_.
     let focusM (selector:ExtractMonad<'handle1, 'handle2>)
@@ -136,6 +138,19 @@ module ExtractMonad =
         focusM selector ma
 
 
+    // ****************************************************
+    // Monadic operations
+
+    let getRegexOptions () : ExtractMonad<'handle, RegexOptions> = 
+        ExtractMonad <| fun opts _ -> Ok opts
+
+    let localOptions (modify : RegexOptions -> RegexOptions)
+                     (ma: ExtractMonad<'handle, 'a>) : ExtractMonad<'handle, 'a> = 
+        ExtractMonad <| fun opts handle -> 
+            apply1 ma (modify opts) handle
+
+    let ignoreCase (ma: ExtractMonad<'handle, 'a>) : ExtractMonad<'handle, 'a> = 
+        localOptions (fun opts -> RegexOptions.IgnoreCase ||| opts) ma
 
     // ****************************************************
     // Monadic operations
@@ -143,8 +158,8 @@ module ExtractMonad =
 
     /// fmap 
     let fmapM (fn:'a -> 'b) (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle,'b> = 
-        ExtractMonad <| fun handle -> 
-           match apply1 ma handle with
+        ExtractMonad <| fun opts handle -> 
+           match apply1 ma opts handle with
            | Error msg -> Error msg
            | Ok a -> Ok (fn a)
 
@@ -161,8 +176,8 @@ module ExtractMonad =
         ma |>> fun _ -> ()
 
     let assertM (failMsg:string) (cond:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,unit> = 
-        ExtractMonad <| fun handle ->
-            match apply1 cond handle with
+        ExtractMonad <| fun opts handle ->
+            match apply1 cond opts handle with
             | Ok true -> Ok ()
             | _ -> Error failMsg
 
@@ -388,12 +403,12 @@ module ExtractMonad =
     /// Implemented in CPS 
     let mapM (mf: 'a -> ExtractMonad<'handle,'b>) 
              (source:'a list) : ExtractMonad<'handle,'b list> = 
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work ys fk sk = 
                 match ys with
                 | [] -> sk []
                 | z :: zs -> 
-                    match apply1 (mf z) handle with
+                    match apply1 (mf z) opts handle with
                     | Error msg -> fk msg
                     | Ok ans -> 
                         work zs fk (fun accs ->
@@ -409,12 +424,12 @@ module ExtractMonad =
     /// Implemented in CPS 
     let mapMz (mf: 'a -> ExtractMonad<'handle,'b>) 
              (source:'a list) : ExtractMonad<'handle,unit> = 
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work ys cont = 
                 match ys with
                 | [] -> cont (Ok ())
                 | z :: zs -> 
-                    match apply1 (mf z) handle with
+                    match apply1 (mf z) opts handle with
                     | Error msg -> cont (Error msg)
                     | Ok _ -> 
                         work zs cont
@@ -427,9 +442,9 @@ module ExtractMonad =
 
 
     let manyM (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, 'a list> =
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work cont = 
-                match apply1 ma handle with
+                match apply1 ma opts handle with
                 | Error msg -> cont []
                 | Ok ans -> 
                     work (fun acc -> cont (ans::acc))
@@ -441,9 +456,9 @@ module ExtractMonad =
 
 
     let skipManyM (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, unit> =
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work cont = 
-                match apply1 ma handle with
+                match apply1 ma opts handle with
                 | Error msg -> cont ()
                 | Ok ans -> 
                     work cont
@@ -481,12 +496,12 @@ module ExtractMonad =
 
     let countM (ntimes:int) 
                (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, 'a list> =
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work ix fk sk = 
                 if ix <= 0 then 
                     sk []
                 else
-                    match apply1 ma handle with
+                    match apply1 ma opts handle with
                     | Error msg -> fk (sprintf "count - %s msg" msg)
                     | Ok ans -> 
                         work (ix-1) fk (fun acc -> sk (ans::acc))
@@ -495,12 +510,12 @@ module ExtractMonad =
 
     let findM (predicate:'a -> ExtractMonad<'handle,bool>)
               (items:'a list) : ExtractMonad<'handle,'a> = 
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work xs fk sk = 
                 match xs with
                 | [] -> fk "findM not found"
                 | item :: rest -> 
-                    match apply1 (predicate item) handle with
+                    match apply1 (predicate item) opts handle with
                     | Ok true -> 
                         sk item
                     | Ok false -> work rest fk sk 
@@ -509,12 +524,12 @@ module ExtractMonad =
 
     let findIndexM (predicate:'a -> ExtractMonad<'handle,bool>)
                    (items:'a list) : ExtractMonad<'handle,int> = 
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work ix xs fk sk = 
                 match xs with
                 | [] -> fk "findM not found"
                 | item :: rest -> 
-                    match apply1 (predicate item) handle with
+                    match apply1 (predicate item) opts handle with
                     | Ok true -> 
                         sk ix
                     | Ok false -> work (ix+1) rest  fk sk 
@@ -523,12 +538,12 @@ module ExtractMonad =
 
     let forallM (predicate:'a -> ExtractMonad<'handle,bool>)
                 (items:'a list) : ExtractMonad<'handle, bool> = 
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work xs cont = 
                 match xs with
                 | [] -> cont true
                 | item :: rest -> 
-                    match apply1 (predicate item) handle with
+                    match apply1 (predicate item) opts handle with
                     | Ok true -> work rest cont
                     | Ok false -> cont false
                     | Error msg -> cont false
@@ -538,12 +553,12 @@ module ExtractMonad =
     /// pickM does not have to return an Option.
     let pickM (chooser:'a -> ExtractMonad<'handle,'b>)
               (items:'a list) : ExtractMonad<'handle, 'b> = 
-        ExtractMonad <| fun handle -> 
+        ExtractMonad <| fun opts handle -> 
             let rec work xs fk sk = 
                 match xs with
                 | [] -> fk "pickM not found"
                 | item :: rest -> 
-                    match apply1 (chooser item) handle with
+                    match apply1 (chooser item) opts handle with
                     | Ok ans -> sk ans
                     | Error _ -> work rest fk sk
             work items (fun msg -> Error msg) (fun ans -> Ok ans)

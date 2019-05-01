@@ -36,3 +36,8 @@ open Extractors.UsarSurvey
 
 let localFile (fileName:string) : string = 
     System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
+
+let sampleFile = @"G:\work\Projects\usar\SAMPLE Survey.docx"
+
+let demo01 () = 
+    Document.runExtractor sampleFile (Document.body &>> extractSurveyInfo)

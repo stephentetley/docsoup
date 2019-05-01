@@ -13,8 +13,8 @@ module Mk5ReplacementForm =
 
     let extractSiteInfo : Body.Extractor< {| Name: string; SAI: string |} > = 
         Body.findTable (Table.firstRow  &>> Row.isMatch [| "Site Information" |]) 
-            &>> pipeM2 (Table.findNameValue1Row "Site Name")
-                       (Table.findNameValue1Row "SAI Number")
+            &>> pipeM2 (Table.findNameValue2Row "Site Name")
+                       (Table.findNameValue2Row "SAI Number")
                        (fun name sai -> {| Name = name; SAI = sai |})
 
 
