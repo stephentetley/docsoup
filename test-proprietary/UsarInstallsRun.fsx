@@ -30,8 +30,8 @@ open FSharp.Data
 #load @"..\src\DocSoup\Document.fs"
 open DocSoup
 
-#load @"Extractors\UsarSurvey.fs"
-open Extractors.UsarSurvey
+#load @"Extractors\UsarInstall.fs"
+open Extractors.UsarInstall
 
 
 let localFile (fileName:string) : string = 
@@ -44,19 +44,27 @@ let getOk (ans:Result<'a, ErrMsg>) : seq<'a> =
     | Error msg -> printfn "%s" msg; Seq.empty
 
 
+let getFiles (searchPattern: string) (info:DirectoryInfo) : FileInfo [] =
+    System.IO.DirectoryInfo(info.FullName).GetFiles( searchPattern = searchPattern
+                                                   , searchOption = SearchOption.AllDirectories)
+
+
 let processBatch (info:DirectoryInfo) : unit = 
-    let outfile = localFile (sprintf "%s usar-surveys.csv" info.Name)
+    let outfile = localFile (sprintf "%s usar-installs.csv" info.Name)
+    let files1 = getFiles "*Install*.docx" info
+    let files2 = getFiles "*Test*.docx" info
     let okays = 
-        System.IO.DirectoryInfo(info.FullName).GetFiles(searchPattern = "*Survey*.docx", searchOption = SearchOption.AllDirectories)
+            Array.append files1 files2
+            |> Array.toSeq
             |> Seq.map (fun file -> 
-                            printfn "%s" file.Name ; processUsarSurvey file.FullName) 
+                            printfn "%s" file.Name ; processUsarInstall file.FullName) 
             |> Seq.collect getOk
-    let table = new UsarSurveyTable(okays)
+    let table = new UsarInstallTable(okays)
     use sw = new StreamWriter(path=outfile, append=false)
     table.Save(writer = sw, separator = ',', quote = '\"')
 
     
-let sourceDirectory = @"G:\work\Projects\usar\nswc\1.Surveys"
+let sourceDirectory = @"G:\work\Projects\usar\nswc\Installs"
 
 let main () : unit = 
     Directory.GetDirectories(sourceDirectory) 

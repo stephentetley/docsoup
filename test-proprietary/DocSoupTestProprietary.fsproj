@@ -9,10 +9,12 @@
     <Compile Include="Extractors/ErskineBatteryForm.fs" />
     <Compile Include="Extractors/Mk5ReplacementForm.fs" />
     <Compile Include="Extractors/UsarSurvey.fs" />
+    <Compile Include="Extractors\UsarInstall.fs" />
     <None Include="PBRun.fsx" />
     <None Include="ErskineBatteriesRun.fsx" />
     <None Include="Mk5Run.fsx" />
     <None Include="UsarSurveysRun.fsx" />
+    <None Include="UsarInstallsRun.fsx" />
   </ItemGroup>
 
   <ItemGroup>
