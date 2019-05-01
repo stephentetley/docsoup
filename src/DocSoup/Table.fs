@@ -6,7 +6,7 @@ namespace DocSoup
 [<RequireQualifiedAccess>]
 module Table = 
     
-    open System.Text.RegularExpressions
+    open System.Text
 
     open DocumentFormat.OpenXml
 
@@ -83,36 +83,38 @@ module Table =
 
 
     /// This function matches the regex pattern to the 'inner text'
-    /// of the table.
+    /// of the cell.
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
-        extractor { 
-            let! input = innerText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = input
-                                , pattern = pattern 
-                                , options = regexOpts )
-        }
+        genRegexIsMatch (fun _ -> innerText) pattern
+
+    let innerTextMatchValue (pattern:string) : Extractor<string> = 
+        genRegexMatchValue (fun _ -> innerText) pattern
+
+    let innerTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        genRegexMatch (fun _ -> innerText) pattern
+
+    let innerTextAllMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAllMatch (fun _ -> innerText) patterns
+
+    let innerTextAnyMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAnyMatch (fun _ -> innerText) patterns
 
     let spacedTextIsMatch (pattern:string) : Extractor<bool> = 
-        extractor { 
-            let! input = spacedText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = input
-                                , pattern = pattern 
-                                , options = regexOpts )
-        }
+        genRegexIsMatch (fun _ -> spacedText) pattern
 
+    let spacedTextMatchValue (pattern:string) : Extractor<string> = 
+        genRegexMatchValue (fun _ -> spacedText) pattern
+
+    let spacedTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        genRegexMatch (fun _ -> spacedText) pattern
 
     let spacedTextAllMatch (patterns:string []) : Extractor<bool> = 
-        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
-        allM predicates
-
+        genRegexAllMatch (fun _ -> spacedText) patterns
 
     let spacedTextAnyMatch (patterns:string []) : Extractor<bool> = 
-        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
-        anyM predicates
+        genRegexAnyMatch (fun _ -> spacedText) patterns
 
     /// Find the string value in a two cell row.
     /// Cell 1 is considered the "name" field.

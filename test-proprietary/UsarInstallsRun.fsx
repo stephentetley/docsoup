@@ -35,7 +35,6 @@ open DocSoup
 #load @"Extractors\Usar\Schema.fs"
 #load @"Extractors\Usar\InstallV2.fs"
 open Extractors.Usar
-open Extractors.Usar.InstallV2
 
 
 let localFile (fileName:string) : string = 
@@ -61,7 +60,8 @@ let processBatch (info:DirectoryInfo) : unit =
             Array.append files1 files2
             |> Array.toSeq
             |> Seq.map (fun file -> 
-                            printfn "%s" file.Name ; processUsarInstall file.FullName) 
+                            printfn "%s" file.Name
+                            InstallV2.processUsarInstall file.FullName) 
             |> Seq.collect getOk
     let table = new UsarInstallTable(okays)
     use sw = new StreamWriter(path=outfile, append=false)

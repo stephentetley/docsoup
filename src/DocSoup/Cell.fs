@@ -20,10 +20,8 @@ module Cell =
 
     type Extractor<'a> = ExtractMonad<Wordprocessing.TableCell,'a> 
 
-    let innerText : Extractor<string> = 
-        asks (fun cell -> cell.InnerText)
 
-    /// Get the cell "Paragraphs text" which should preserves newline.
+    /// Get Paragraphs in the cell.
     let paragraphs : Extractor<seq<Wordprocessing.Paragraph>> = 
         asks (fun cell -> cell.Elements<Wordprocessing.Paragraph>())
 
@@ -51,6 +49,13 @@ module Cell =
             return! findIndexM (fun para1 -> focus para1 predicate) xs
         }
 
+    // ****************************************************
+    // Get the text
+
+    let innerText : Extractor<string> = 
+        asks (fun cell -> cell.InnerText)
+
+
     /// Get the cell "Paragraphs text" which should preserves newline.
     let spacedText : Extractor<string> = 
         extractor { 
@@ -65,50 +70,35 @@ module Cell =
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
-        extractor { 
-            let! inner = innerText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = inner
-                                , pattern = pattern
-                                , options = regexOpts )
-        }
+        genRegexIsMatch (fun _ -> innerText) pattern
+
+    let innerTextMatchValue (pattern:string) : Extractor<string> = 
+        genRegexMatchValue (fun _ -> innerText) pattern
+
+    let innerTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        genRegexMatch (fun _ -> innerText) pattern
+
+    let innerTextAllMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAllMatch (fun _ -> innerText) patterns
+
+    let innerTextAnyMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAnyMatch (fun _ -> innerText) patterns
 
     let spacedTextIsMatch (pattern:string) : Extractor<bool> = 
-        extractor { 
-            let! inner = spacedText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = inner
-                                , pattern = pattern
-                                , options = regexOpts )
-        }
-
-    let isMatch (pattern:string) : Extractor<bool> = 
-        spacedTextIsMatch pattern
-
-
-    let spacedTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
-        extractor { 
-            let! inner = spacedText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.Match( input = inner
-                              , pattern = pattern
-                              , options = regexOpts )
-        }
+        genRegexIsMatch (fun _ -> spacedText) pattern
 
     let spacedTextMatchValue (pattern:string) : Extractor<string> = 
-        extractor { 
-            let! matchObj = spacedTextMatch pattern 
-            if matchObj.Success then
-                return matchObj.Value
-            else
-                return! extractError "no match"
-        }
+        genRegexMatchValue (fun _ -> spacedText) pattern
+
+    let spacedTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        genRegexMatch (fun _ -> spacedText) pattern
+
+    let spacedTextAllMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAllMatch (fun _ -> spacedText) patterns
+
+    let spacedTextAnyMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAnyMatch (fun _ -> spacedText) patterns
 
 
 
 
-    let regexMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
-        spacedTextMatch pattern
-
-    let regexMatchValue (pattern:string) : Extractor<string> = 
-        spacedTextMatchValue pattern

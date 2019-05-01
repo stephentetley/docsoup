@@ -34,7 +34,6 @@ open DocSoup
 #load @"Extractors\Usar\Schema.fs"
 #load @"Extractors\Usar\SurveyV2.fs"
 open Extractors.Usar
-open Extractors.Usar.SurveyV2
 
 let localFile (fileName:string) : string = 
     System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data/output", fileName)
@@ -51,7 +50,8 @@ let processBatch (info:DirectoryInfo) : unit =
     let okays = 
         System.IO.DirectoryInfo(info.FullName).GetFiles(searchPattern = "*Survey*.docx", searchOption = SearchOption.AllDirectories)
             |> Seq.map (fun file -> 
-                            printfn "%s" file.Name ; processUsarSurveyV2 file.FullName) 
+                            printfn "%s" file.Name
+                            SurveyV2.processUsarSurvey file.FullName) 
             |> Seq.collect getOk
     let table = new UsarSurveyTable(okays)
     use sw = new StreamWriter(path=outfile, append=false)

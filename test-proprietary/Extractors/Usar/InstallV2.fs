@@ -3,6 +3,7 @@
 
 namespace Extractors.Usar
 
+[<RequireQualifiedAccess>]
 module InstallV2 =
 
     open DocSoup
@@ -12,7 +13,7 @@ module InstallV2 =
                                              ; SensorName: string
                                              ; ProcessArea: string 
                                              ; AssetReference: string |} > = 
-        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.isMatch "Site Name") 
+        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.innerTextIsMatch "Site Name") 
             &>> pipeM4 (Table.findNameValue2Row "Site Name")
                        (Table.findNameValue2Row "Sensor name")
                        (Table.findNameValue2Row "Process area")
@@ -26,7 +27,7 @@ module InstallV2 =
 
     let extractVisitInfo : Body.Extractor< {| Engineer: string
                                             ; InstallDate: string |} > = 
-        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.isMatch "Checked By") 
+        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.innerTextIsMatch "Checked By") 
             &>> pipeM2 (Table.findNameValue2Row "Checked By")
                        (Table.findNameValue2Row "Date")
                        (fun engineer installDate -> 

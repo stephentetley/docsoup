@@ -65,35 +65,38 @@ module Row =
         cellsSpacedText |>> Common.fromLines
 
     /// This function matches the regex pattern to the 'inner text'
-    /// of the row.
+    /// of the cell.
     /// The inner text does not preserve whitespace, so **do not**
     /// try to match against a whitespace sensitive pattern.
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
-        extractor { 
-            let! inner = innerText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = inner
-                                , pattern = pattern
-                                , options = regexOpts )
-        }
+        genRegexIsMatch (fun _ -> innerText) pattern
+
+    let innerTextMatchValue (pattern:string) : Extractor<string> = 
+        genRegexMatchValue (fun _ -> innerText) pattern
+
+    let innerTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        genRegexMatch (fun _ -> innerText) pattern
+
+    let innerTextAllMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAllMatch (fun _ -> innerText) patterns
+
+    let innerTextAnyMatch (patterns:string []) : Extractor<bool> = 
+        genRegexAnyMatch (fun _ -> innerText) patterns
 
     let spacedTextIsMatch (pattern:string) : Extractor<bool> = 
-        extractor { 
-            let! inner = spacedText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = inner
-                                , pattern = pattern
-                                , options = regexOpts )
-        }
+        genRegexIsMatch (fun _ -> spacedText) pattern
+
+    let spacedTextMatchValue (pattern:string) : Extractor<string> = 
+        genRegexMatchValue (fun _ -> spacedText) pattern
+
+    let spacedTextMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
+        genRegexMatch (fun _ -> spacedText) pattern
 
     let spacedTextAllMatch (patterns:string []) : Extractor<bool> = 
-        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
-        allM predicates
-
+        genRegexAllMatch (fun _ -> spacedText) patterns
 
     let spacedTextAnyMatch (patterns:string []) : Extractor<bool> = 
-        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
-        anyM predicates
+        genRegexAnyMatch (fun _ -> spacedText) patterns
 
 
     let cellsMatch (cellPatterns:string []) : Extractor<bool> = 
@@ -101,7 +104,7 @@ module Row =
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
                 liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
-            return! forallM (fun (patt,cell1) -> focus cell1 (Cell.isMatch patt)) pairs
+            return! forallM (fun (patt,cell1) -> focus cell1 (Cell.spacedTextIsMatch patt)) pairs
         }
 
     // TODO - use regex groups for a function like rowIsMatch that returns matches
@@ -113,7 +116,7 @@ module Row =
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
                 liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
-            return! mapM (fun (patt,cell1) -> focus cell1 (Cell.regexMatch patt)) pairs |>> List.toArray
+            return! mapM (fun (patt,cell1) -> focus cell1 (Cell.spacedTextMatch patt)) pairs |>> List.toArray
         }
 
 
@@ -126,7 +129,7 @@ module Row =
             let! pairs = 
                 liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
             return! mapM (fun (patt,cell1) -> 
-                            focus cell1 (Cell.regexMatchValue patt)) pairs |>> List.toArray
+                            focus cell1 (Cell.spacedTextMatchValue patt)) pairs |>> List.toArray
         }
 
     /// Parse a two column row with "name" in the first cell and 

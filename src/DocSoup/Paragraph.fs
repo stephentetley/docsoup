@@ -23,44 +23,27 @@ module Paragraph =
     let innerText : Extractor<string> = 
         asks (fun paragraph -> paragraph.InnerText)
 
+
+
     /// This function matches the regex pattern to the 'inner text'
     /// of the cell.
     let textIsMatch (pattern:string) : Extractor<bool> = 
-        extractor { 
-            let! inner = innerText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = inner
-                                , pattern = pattern
-                                , options = regexOpts )
-        }
+        genRegexIsMatch (fun _ -> innerText) pattern
 
     /// This function matches the regex pattern to the 'inner text'
     /// of the cell.
     let textMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
-        extractor { 
-            let! inner = innerText 
-            let! regexOpts = getRegexOptions ()
-            return Regex.Match( input = inner
-                              , pattern = pattern
-                              , options = regexOpts )
-        }
+        genRegexMatch (fun _ -> innerText) pattern
 
 
-    let matchValue (pattern:string) : Extractor<string> = 
-        extractor { 
-            let! matchObj = textMatch pattern 
-            if matchObj.Success then
-                return matchObj.Value
-            else
-                return! extractError "no match"
-        }
+
+    let textMatchValue (pattern:string) : Extractor<string> = 
+        genRegexMatchValue (fun _ -> innerText) pattern
 
 
     let textAllMatch (patterns:string []) : Extractor<bool> = 
-        let predicates = patterns |> Array.toList |> List.map textIsMatch
-        allM predicates
+        genRegexAllMatch (fun _ -> innerText) patterns
 
 
     let textAnyMatch (patterns:string []) : Extractor<bool> = 
-        let predicates = patterns |> Array.toList |> List.map textIsMatch
-        anyM predicates
+        genRegexAnyMatch (fun _ -> innerText) patterns
