@@ -77,8 +77,26 @@ module Row =
                                 , options = regexOpts )
         }
 
+    let spacedTextIsMatch (pattern:string) : Extractor<bool> = 
+        extractor { 
+            let! inner = spacedText 
+            let! regexOpts = getRegexOptions ()
+            return Regex.IsMatch( input = inner
+                                , pattern = pattern
+                                , options = regexOpts )
+        }
 
-    let isMatch (cellPatterns:string []) : Extractor<bool> = 
+    let spacedTextAllMatch (patterns:string []) : Extractor<bool> = 
+        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
+        allM predicates
+
+
+    let spacedTextAnyMatch (patterns:string []) : Extractor<bool> = 
+        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
+        anyM predicates
+
+
+    let cellsMatch (cellPatterns:string []) : Extractor<bool> = 
         extractor { 
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
@@ -90,7 +108,7 @@ module Row =
 
     /// Use with caution - a `RegularExpressions.Match` has not necessarily 
     /// matched the input string. The `.Success` property may be false.
-    let regexMatch (cellPatterns:string []) : Extractor<RegularExpressions.Match []> = 
+    let cellsRegexMatch (cellPatterns:string []) : Extractor<RegularExpressions.Match []> = 
         extractor { 
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
@@ -102,7 +120,7 @@ module Row =
     /// Prefer this to `regexMatch` if you are expecting an array 
     /// of successful matches and you don't need to inspect the result
     /// (e.g. for a match group).
-    let regexMatchValues (cellPatterns:string []) : Extractor<string []> = 
+    let cellsMatchValues (cellPatterns:string []) : Extractor<string []> = 
         extractor { 
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
@@ -115,7 +133,7 @@ module Row =
     /// "value" in the second cell.
     let nameValue2Row (namePattern:string) : Extractor<string> = 
         extractor { 
-            let! arr = regexMatchValues [| namePattern; ".*" |]
+            let! arr = cellsMatchValues [| namePattern; ".*" |]
             let! ans = liftAction "nameValue1Row - bad index" (fun _ -> arr.[1])
             return ans
         }
@@ -124,7 +142,7 @@ module Row =
     /// "value1" and "value2" in the second and third cells.
     let nameValue3Row (namePattern:string) : Extractor<string * string> = 
         extractor { 
-            let! arr = regexMatchValues [| namePattern; ".*"; ".*" |]
+            let! arr = cellsMatchValues [| namePattern; ".*"; ".*" |]
             let! ans1 = liftAction "nameValue2Row - bad index" (fun _ -> arr.[1])
             let! ans2 = liftAction "nameValue2Row - bad index" (fun _ -> arr.[2])
             return (ans1, ans2)
@@ -134,7 +152,7 @@ module Row =
     /// "value1", "value2" and "value3" in the second, third and fourth cells.
     let nameValue4Row (namePattern:string) : Extractor<string * string * string> = 
         extractor { 
-            let! arr = regexMatchValues [| namePattern; ".*"; ".*" ; ".*" |]
+            let! arr = cellsMatchValues [| namePattern; ".*"; ".*" ; ".*" |]
             let! ans1 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[1])
             let! ans2 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[2])
             let! ans3 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[3])

@@ -34,6 +34,23 @@ module Cell =
             return! liftOption (Seq.tryItem index xs)
         }
 
+    let paragraphCount : Extractor<int> = paragraphs |>> Seq.length
+
+    let firstParagraph : Extractor<Wordprocessing.Paragraph> = paragraph 0 
+
+
+    let findParagraph (predicate:Paragraph.Extractor<bool>) : Extractor<Wordprocessing.Paragraph> = 
+        extractor { 
+            let! xs = paragraphs |>> Seq.toList
+            return! findM (fun para1 -> focus para1 predicate) xs
+        }
+
+    let findParagraphIndex (predicate:Paragraph.Extractor<bool>) : Extractor<int> = 
+        extractor { 
+            let! xs = paragraphs |>> Seq.toList
+            return! findIndexM (fun para1 -> focus para1 predicate) xs
+        }
+
     /// Get the cell "Paragraphs text" which should preserves newline.
     let spacedText : Extractor<string> = 
         extractor { 

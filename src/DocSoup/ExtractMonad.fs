@@ -399,6 +399,59 @@ module ExtractMonad =
         kleisliR mf mg source
 
 
+    let andM (ma:ExtractMonad<'handle,bool>)
+             (mb:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,bool> =
+        pipeM2 ma mb (&&)
+
+
+    let ( <&&> ) (ma:ExtractMonad<'handle,bool>)
+                 (mb:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,bool> =
+        andM ma mb
+
+
+    let orM (ma:ExtractMonad<'handle,bool>)
+            (mb:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,bool> =
+        ma >>= fun ans -> 
+        if ans then 
+            mreturn true 
+        else 
+            mb >>= fun ans2 -> mreturn ans2
+
+    let ( <||> ) (ma:ExtractMonad<'handle,bool>)
+                 (mb:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,bool> =
+        orM ma mb
+
+    // ****************************************************
+    // List processing
+
+    /// This interprets failure as false.
+    /// Is this correct... wise...
+    let allM (predicates: ExtractMonad<'handle, bool> list) : ExtractMonad<'handle,bool> =
+        ExtractMonad <| fun opts handle -> 
+            let rec work ys cont = 
+                match ys with
+                | [] -> cont (Ok true)
+                | test :: rest -> 
+                    match apply1 test opts handle with
+                    | Error msg -> cont (Ok false)    // short circuit
+                    | Ok false -> cont (Ok false)    // short circuit
+                    | Ok true -> work rest cont
+            work predicates (fun ans -> ans)
+
+    /// This interprets failure as false.
+    /// Is this correct... wise...
+    let anyM (predicates: ExtractMonad<'handle, bool> list) : ExtractMonad<'handle,bool> =
+        ExtractMonad <| fun opts handle -> 
+            let rec work ys cont = 
+                match ys with
+                | [] -> cont (Ok false)
+                | test :: rest -> 
+                    match apply1 test opts handle with
+                    | Error msg -> work rest cont   
+                    | Ok false -> work rest cont    // short circuit
+                    | Ok true -> cont (Ok true)
+            work predicates (fun ans -> ans)
+
 
     /// Implemented in CPS 
     let mapM (mf: 'a -> ExtractMonad<'handle,'b>) 

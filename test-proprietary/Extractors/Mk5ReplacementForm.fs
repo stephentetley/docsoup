@@ -12,14 +12,14 @@ module Mk5ReplacementForm =
     open DocSoup
 
     let extractSiteInfo : Body.Extractor< {| Name: string; SAI: string |} > = 
-        Body.findTable (Table.firstRow  &>> Row.isMatch [| "Site Information" |]) 
+        Body.findTable (Table.firstRow  &>> Row.cellsMatch [| "Site Information" |]) 
             &>> pipeM2 (Table.findNameValue2Row "Site Name")
                        (Table.findNameValue2Row "SAI Number")
                        (fun name sai -> {| Name = name; SAI = sai |})
 
 
     let extractVisitInfo : Body.Extractor< {| Company: string; Name: string; Date: string |} > = 
-        Body.findTable (Table.firstRow &>> Row.isMatch [| "Install Information" |]) 
+        Body.findTable (Table.firstRow &>> Row.cellsMatch [| "Install Information" |]) 
             &>> pipeM3 (Table.cell (1,1) &>> Cell.spacedText)
                        (Table.cell (2,1) &>> Cell.spacedText)
                        (Table.cell (3,1) &>> Cell.spacedText)
@@ -32,7 +32,7 @@ module Mk5ReplacementForm =
     let extractOutstationInfo : Body.Extractor< {| Name: string; Address: string
                                                 ; OldType: string; OldId: string
                                                 ; NewType: string; NewId:string |} > = 
-        Body.findTable (Table.firstRow &>> Row.isMatch [| "Outstation Information" |]) 
+        Body.findTable (Table.firstRow &>> Row.cellsMatch [| "Outstation Information" |]) 
             &>> pipeM6 (Table.cell (1,1) &>> Cell.spacedText)
                        (Table.cell (2,1) &>> Cell.spacedText)
                        (Table.cell (3,1) &>> Cell.spacedText)
@@ -51,7 +51,7 @@ module Mk5ReplacementForm =
     let extractAdditionalComments : Body.Extractor< {| Issues: string
                                                     ; QA: string
                                                     ; Maintenance: string |} > = 
-        Body.findTable (Table.firstRow &>> Row.isMatch [| "Additional Comment" |]) 
+        Body.findTable (Table.firstRow &>> Row.cellsMatch [| "Additional Comment" |]) 
             &>> pipeM3 (Table.cell (1,1) &>> Cell.spacedText)
                        (Table.cell (2,1) &>> Cell.spacedText)
                        (Table.cell (3,1) &>> Cell.spacedText)

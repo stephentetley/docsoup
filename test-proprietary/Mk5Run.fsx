@@ -23,6 +23,7 @@ open FSharp.Data
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
+#load @"..\src\DocSoup\Paragraph.fs"
 #load @"..\src\DocSoup\Cell.fs"
 #load @"..\src\DocSoup\Row.fs"
 #load @"..\src\DocSoup\Table.fs"
@@ -58,16 +59,7 @@ let main () : unit =
     table.Save(writer = sw, separator = ',', quote = '\"')
 
 
-let sampleFile = @"G:\work\Projects\rtu\mk5-mmims\SAMPLE Upgrade Site Works.docx"
-
-let demo01 () = 
-    Document.runExtractor sampleFile (Document.body &>> extractSiteInfo)
+// let sampleFile = @"G:\work\Projects\rtu\mk5-mmims\SAMPLE Upgrade Site Works.docx"
 
 
-let demo02 () = 
-    Document.runExtractor sampleFile 
-        (Document.body &>> tupleM4 extractSiteInfo 
-                                      extractVisitInfo 
-                                      extractOutstationInfo
-                                      extractAdditionalComments)
 

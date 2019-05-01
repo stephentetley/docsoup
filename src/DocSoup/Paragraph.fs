@@ -25,9 +25,7 @@ module Paragraph =
 
     /// This function matches the regex pattern to the 'inner text'
     /// of the cell.
-    /// The inner text does not preserve whitespace, so **do not**
-    /// try to match against a whitespace sensitive pattern.
-    let isMatch (pattern:string) : Extractor<bool> = 
+    let textIsMatch (pattern:string) : Extractor<bool> = 
         extractor { 
             let! inner = innerText 
             let! regexOpts = getRegexOptions ()
@@ -36,7 +34,8 @@ module Paragraph =
                                 , options = regexOpts )
         }
 
-
+    /// This function matches the regex pattern to the 'inner text'
+    /// of the cell.
     let textMatch (pattern:string) : Extractor<RegularExpressions.Match> = 
         extractor { 
             let! inner = innerText 
@@ -55,3 +54,13 @@ module Paragraph =
             else
                 return! extractError "no match"
         }
+
+
+    let textAllMatch (patterns:string []) : Extractor<bool> = 
+        let predicates = patterns |> Array.toList |> List.map textIsMatch
+        allM predicates
+
+
+    let textAnyMatch (patterns:string []) : Extractor<bool> = 
+        let predicates = patterns |> Array.toList |> List.map textIsMatch
+        anyM predicates

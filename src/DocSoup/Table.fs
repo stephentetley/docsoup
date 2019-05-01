@@ -88,12 +88,31 @@ module Table =
     /// try to match against a whitespace sensitive pattern.
     let innerTextIsMatch (pattern:string) : Extractor<bool> = 
         extractor { 
-            let! inner = innerText 
+            let! input = innerText 
             let! regexOpts = getRegexOptions ()
-            return Regex.IsMatch( input = inner
+            return Regex.IsMatch( input = input
                                 , pattern = pattern 
                                 , options = regexOpts )
         }
+
+    let spacedTextIsMatch (pattern:string) : Extractor<bool> = 
+        extractor { 
+            let! input = spacedText 
+            let! regexOpts = getRegexOptions ()
+            return Regex.IsMatch( input = input
+                                , pattern = pattern 
+                                , options = regexOpts )
+        }
+
+
+    let spacedTextAllMatch (patterns:string []) : Extractor<bool> = 
+        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
+        allM predicates
+
+
+    let spacedTextAnyMatch (patterns:string []) : Extractor<bool> = 
+        let predicates = patterns |> Array.toList |> List.map spacedTextIsMatch
+        anyM predicates
 
     /// Find the string value in a two cell row.
     /// Cell 1 is considered the "name" field.

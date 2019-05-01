@@ -23,6 +23,7 @@ open FSharp.Data
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
+#load @"..\src\DocSoup\Paragraph.fs"
 #load @"..\src\DocSoup\Cell.fs"
 #load @"..\src\DocSoup\Row.fs"
 #load @"..\src\DocSoup\Table.fs"
@@ -68,4 +69,7 @@ let v1Sample = @"G:\work\Projects\usar\SAMPLE V1 Survey.docx"
 let dummy01 () = 
     Document.runExtractor v1Sample 
         (Document.body &>> Body.table 0 &>> Table.firstCell &>> Cell.spacedText)
+
+let dummy02 () : Answer<bool> = 
+    Document.runExtractor v1Sample (mreturn true <&&> mreturn true)
 

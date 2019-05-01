@@ -24,6 +24,7 @@ open FSharp.Data
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\ExtractMonad.fs"
+#load @"..\src\DocSoup\Paragraph.fs"
 #load @"..\src\DocSoup\Cell.fs"
 #load @"..\src\DocSoup\Row.fs"
 #load @"..\src\DocSoup\Table.fs"
@@ -110,4 +111,3 @@ let demo06 ()  =
     Document.runExtractor sampleFile siteWorksExtractor
 
 
-    
