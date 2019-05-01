@@ -27,3 +27,43 @@ module UsarSurvey =
                              ; ProcessArea = processArea 
                              ; AssetReference = reference 
                             |})
+
+    let extractVisitInfo : Body.Extractor< {| Engineer: string
+                                             ; SurveyDate: string |} > = 
+        ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.isMatch "Surveyed By") 
+            &>> pipeM2 (Table.findNameValue2Row "Surveyed By")
+                       (Table.findNameValue2Row "Date")
+                       (fun engineer surveyData -> 
+                            {| Engineer = engineer
+                             ; SurveyDate = surveyData 
+                            |})
+
+    [<Literal>]
+    let OutputSchema = 
+        "Site Name(string), Sensor Name(string), " +
+        "Process Area(string), Asset Reference(string), " +
+        "Engineer(string), Survey Date(string)"
+
+    type UsarSurveyTable = 
+        CsvProvider< Sample = OutputSchema,
+                     Schema = OutputSchema,
+                     HasHeaders = true >
+
+    type UsarSurveyRow = UsarSurveyTable.Row
+
+
+    let usarSurveyExtractor : Document.Extractor<UsarSurveyRow> = 
+        Document.body 
+            &>> pipeM2 extractSurveyInfo 
+                        extractVisitInfo
+                        ( fun r1 r2 -> 
+                            UsarSurveyRow   ( siteName = r1.SiteName
+                                            , sensorName = r1.SensorName
+                                            , processArea = r1.ProcessArea
+                                            , assetReference = r1.AssetReference
+                                            , engineer = r2.Engineer
+                                            , surveyDate = r2.SurveyDate
+                                            ))
+
+    let processUsarSurvey (filePath:string) : Answer<UsarSurveyRow>  =
+        Document.runExtractor filePath usarSurveyExtractor

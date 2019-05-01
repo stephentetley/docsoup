@@ -37,7 +37,27 @@ open Extractors.UsarSurvey
 let localFile (fileName:string) : string = 
     System.IO.Path.Combine (__SOURCE_DIRECTORY__ , "../data", fileName)
 
-let sampleFile = @"G:\work\Projects\usar\SAMPLE Survey.docx"
 
-let demo01 () = 
-    Document.runExtractor sampleFile (Document.body &>> extractSurveyInfo)
+let getOk (ans:Result<'a, ErrMsg>) : seq<'a> = 
+    match ans with
+    | Ok a -> Seq.singleton a
+    | Error msg -> printfn "%s" msg; Seq.empty
+
+let sourceDirectory = @"G:\work\Projects\usar\nswc\1.Surveys"
+
+let processBatch (info:DirectoryInfo) : unit = 
+    let outfile = localFile (sprintf "%s usar-surveys.csv" info.Name)
+    let okays = 
+        System.IO.DirectoryInfo(info.FullName).GetFiles(searchPattern = "*Site Works.docx", searchOption = SearchOption.AllDirectories)
+            |> Seq.map (fun file -> 
+                            printfn "%s" file.Name ; processUsarSurvey file.FullName) 
+            |> Seq.collect getOk
+    let table = new UsarSurveyTable(okays)
+    use sw = new StreamWriter(path=outfile, append=false)
+    table.Save(writer = sw, separator = ',', quote = '\"')
+
+
+let main () : unit = 
+    let root = @"G:\work\Projects\rtu\Erskines\erskines-incoming"
+    Directory.GetDirectories(sourceDirectory) 
+        |> Array.iter (fun path -> processBatch (DirectoryInfo(path)))
