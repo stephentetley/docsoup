@@ -26,7 +26,7 @@ module SurveyV2 =
                             |})
 
     let extractVisitInfo : Body.Extractor< {| Engineer: string
-                                             ; SurveyDate: string |} > = 
+                                            ; SurveyDate: string |} > = 
         ignoreCase <| Body.findTable (Table.firstCell  &>> Cell.innerText &>> Text.isMatch "Surveyed By") 
             &>> pipeM2 (Table.findNameValue2Row "Surveyed By")
                        (Table.findNameValue2Row "Date")

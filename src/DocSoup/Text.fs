@@ -70,6 +70,9 @@ module Text =
         contents |>> fun str -> 
             str.Substring(startIndex = 0, length = endIndex)
 
+    let trim : Extractor<string> = 
+        contents |>> fun str -> str.Trim()
+        
 
     // ****************************************************
     // Regex matching

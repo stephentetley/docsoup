@@ -48,13 +48,20 @@ let getOk (ans:Result<'a, ErrMsg>) : seq<'a> =
     | Error msg -> printfn "%s" msg; Seq.empty
 
 
+let processSurvey (path:string) : Answer<UsarSurveyRow> = 
+    match SurveyV2.processUsarSurvey path with
+    | Ok ans -> Ok ans
+    | Error _ -> SurveyV1.processUsarSurvey path
+
+
+
 let processBatch (info:DirectoryInfo) : unit = 
     let outfile = localFile (sprintf "%s usar-surveys.csv" info.Name)
     let okays = 
         System.IO.DirectoryInfo(info.FullName).GetFiles(searchPattern = "*Survey*.docx", searchOption = SearchOption.AllDirectories)
             |> Seq.map (fun file -> 
                             printfn "%s" file.Name
-                            SurveyV2.processUsarSurvey file.FullName) 
+                            processSurvey file.FullName) 
             |> Seq.collect getOk
     let table = new UsarSurveyTable(okays)
     use sw = new StreamWriter(path=outfile, append=false)
@@ -75,7 +82,8 @@ let dummy01 () =
 
 let dummy02 ()  = 
     Document.runExtractor v1Sample 
-            (Document.body &>> SurveyV1.extractSurveyInfo)
+            (Document.body &>> 
+                tupleM2 SurveyV1.extractSurveyInfo SurveyV1.extractVisitInfo)
 
 let dummy03 () = 
     let ans = Regex.Match(input = "one two three", pattern = "two")
@@ -88,4 +96,7 @@ let dummy04 () =
     runExtractMonad v1Sample (fun _ -> "one-two-three")
         <| tupleM2 (Text.leftOfMatch "two") (Text.rightOfMatch "two")
 
+let dummy05 () = 
+    runExtractMonad v1Sample (fun _ -> "Site BRUNSWICK")
+        <| (Text.rightOfMatch "Site(\s*:?\s*)" &>> Text.trim)
 
