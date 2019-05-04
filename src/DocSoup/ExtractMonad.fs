@@ -94,6 +94,10 @@ module ExtractMonad =
             | Error _ -> Error msg
             | Ok a -> Ok a
 
+    
+    let ( <?> ) (ma:ExtractMonad<'handle,'a>) (msg:string) : ExtractMonad<'handle,'a> = 
+        swapError msg ma
+
 
     // ****************************************************
     // Bind operations
@@ -175,11 +179,9 @@ module ExtractMonad =
     let ignoreM (ma:ExtractMonad<'handle,'a>) : ExtractMonad<'handle, unit> = 
         ma |>> fun _ -> ()
 
-    let assertM (failMsg:string) (cond:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,unit> = 
-        ExtractMonad <| fun opts handle ->
-            match apply1 cond opts handle with
-            | Ok true -> Ok ()
-            | _ -> Error failMsg
+
+    let liftAssert (failMsg:string) (condition:bool) : ExtractMonad<'handle, unit> = 
+        if condition then mreturn () else extractError failMsg
 
     /// Lift an option value.
     /// Some ans becomes a success value in the ExtractMonad.
@@ -192,12 +194,19 @@ module ExtractMonad =
     /// Lift an action that may fail (e.g. an IO operation).
     /// If the action does fail, replace the hard error with 
     /// a (soft) error within the monad.
-    let liftAction (errMsg:string) (action: unit -> 'a) : ExtractMonad<'handle, 'a> = 
+    let liftOperation (errMsg:string) (operation: unit -> 'a) : ExtractMonad<'handle, 'a> = 
         try 
-            let ans = action ()
+            let ans = operation ()
             mreturn ans
         with
         | _ -> extractError errMsg
+
+
+    let assertM (failMsg:string) (cond:ExtractMonad<'handle,bool>) : ExtractMonad<'handle,unit> = 
+        ExtractMonad <| fun opts handle ->
+            match apply1 cond opts handle with
+            | Ok true -> Ok ()
+            | _ -> Error failMsg
 
 
     // liftM (which is fmap)

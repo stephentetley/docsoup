@@ -69,7 +69,7 @@ module Row =
         extractor { 
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
-                liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
+                liftOperation "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
             return! forallM (fun (patt,cell1) -> focus cell1 (Cell.spacedText &>> Text.isMatch patt)) pairs
         }
 
@@ -81,7 +81,7 @@ module Row =
         extractor { 
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
-                liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
+                liftOperation "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
             return! mapM (fun (patt,cell1) -> focus cell1 (Cell.spacedText &>> Text.regexMatch patt)) pairs |>> List.toArray
         }
 
@@ -93,7 +93,7 @@ module Row =
         extractor { 
             let! arrCells = cells |>> Seq.toArray
             let! pairs = 
-                liftAction "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
+                liftOperation "zip mismatch" (fun _ -> Array.zip cellPatterns arrCells) |>> Array.toList
             return! mapM (fun (patt,cell1) -> 
                             focus cell1 (Cell.spacedText &>> Text.matchValue patt)) pairs |>> List.toArray
         }
@@ -103,7 +103,7 @@ module Row =
     let nameValue2Row (namePattern:string) : Extractor<string> = 
         extractor { 
             let! arr = cellsMatchValues [| namePattern; ".*" |]
-            let! ans = liftAction "nameValue1Row - bad index" (fun _ -> arr.[1])
+            let! ans = liftOperation "nameValue1Row - bad index" (fun _ -> arr.[1])
             return ans
         }
 
@@ -112,8 +112,8 @@ module Row =
     let nameValue3Row (namePattern:string) : Extractor<string * string> = 
         extractor { 
             let! arr = cellsMatchValues [| namePattern; ".*"; ".*" |]
-            let! ans1 = liftAction "nameValue2Row - bad index" (fun _ -> arr.[1])
-            let! ans2 = liftAction "nameValue2Row - bad index" (fun _ -> arr.[2])
+            let! ans1 = liftOperation "nameValue2Row - bad index" (fun _ -> arr.[1])
+            let! ans2 = liftOperation "nameValue2Row - bad index" (fun _ -> arr.[2])
             return (ans1, ans2)
         }
 
@@ -122,9 +122,9 @@ module Row =
     let nameValue4Row (namePattern:string) : Extractor<string * string * string> = 
         extractor { 
             let! arr = cellsMatchValues [| namePattern; ".*"; ".*" ; ".*" |]
-            let! ans1 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[1])
-            let! ans2 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[2])
-            let! ans3 = liftAction "nameValue3Row - bad index" (fun _ -> arr.[3])
+            let! ans1 = liftOperation "nameValue3Row - bad index" (fun _ -> arr.[1])
+            let! ans2 = liftOperation "nameValue3Row - bad index" (fun _ -> arr.[2])
+            let! ans3 = liftOperation "nameValue3Row - bad index" (fun _ -> arr.[3])
             return (ans1, ans2, ans3)
         }
 

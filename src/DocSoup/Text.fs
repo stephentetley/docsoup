@@ -108,6 +108,15 @@ module Text =
             extractError "no match"
 
 
+    let matchGroups (pattern:string) : Extractor<RegularExpressions.GroupCollection> =
+        regexMatch pattern >>= fun matchObj -> 
+        if matchObj.Success then
+            mreturn matchObj.Groups
+        else
+            extractError "no match"
+
+
+
     let anyMatch (patterns:string []) : Extractor<bool> = 
         let (predicates : Extractor<bool> list) = 
             patterns |> Array.toList |> List.map isMatch
