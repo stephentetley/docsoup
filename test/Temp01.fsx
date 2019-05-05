@@ -80,3 +80,26 @@ let dummy2a () =
         answer.Value |> Ok
     else
         Error "bah"
+
+let dummy3 () = 
+    let pattern = "(?<one>[Oo]ne).*(?<three>[Tt]hree)"
+    let answer = Regex.Match(input = "one two three", pattern = pattern)
+    if answer.Success then 
+        answer.Groups
+            |> Seq.cast<Group> 
+            |> Seq.map (fun (g:Group) -> (g.Name, g.Value))
+    else    
+        failwith "no match"
+
+let dummy3a () = 
+    let pattern = "([Oo]ne).*([Tt]hree)"
+    let answer = Regex.Match(input = "one two three", pattern = pattern)
+    if answer.Success then 
+        answer.Groups
+            |> Seq.cast<Group> 
+            |> Seq.map (fun (g:Group) -> (g.Name, g.Value))
+    else    
+        failwith "no match"
+
+let dummy4 () = 
+    internalRunExtract "one two three" <| Text.matchNamedMatches "(?<one>[Oo]ne).*(?<three>[Tt]hree)"

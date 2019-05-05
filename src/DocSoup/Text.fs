@@ -115,7 +115,24 @@ module Text =
         else
             extractError "no match"
 
-
+    let private isNumber (str:string) : bool = 
+        let pattern = "^\d+$"
+        Regex.IsMatch(input = str, pattern = pattern)
+        
+    /// This only returns user named matches, not the 'internal' ones given 
+    /// numeric names by .Net's regex library.
+    let matchNamedMatches (pattern:string) : Extractor<Map<string, string>> =
+        regexMatch pattern >>= fun matchObj -> 
+        if matchObj.Success then
+            let nameValues = matchObj.Groups |> Seq.cast<Group> 
+            let matches = 
+                Seq.fold (fun acc (grp:Group) -> 
+                            if isNumber grp.Name then acc else Map.add grp.Name grp.Value acc)
+                        Map.empty
+                        nameValues
+            mreturn matches
+        else
+            extractError "no match"
 
     let anyMatch (patterns:string []) : Extractor<bool> = 
         let (predicates : Extractor<bool> list) = 

@@ -82,6 +82,13 @@ module ExtractMonad =
             | Ok ans -> ans
 
 
+    let internalRunExtract (handle:'handle)  
+                           (ma:ExtractMonad<'handle,'a>) : Result<'a,ErrMsg> = 
+        let opts = RegexOptions.None
+        match apply1 ma opts handle with
+        | Error msg -> Error msg
+        | Ok ans -> Ok ans
+
     // ****************************************************
     // Errors
 
