@@ -18,7 +18,7 @@ module Cell =
 
     let (extractor:CellExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableCell>()
 
-    type Extractor<'a> = ExtractMonad<Wordprocessing.TableCell,'a> 
+    type Extractor<'a> = ExtractMonad<'a, Wordprocessing.TableCell> 
 
 
     /// Get Paragraphs in the cell.

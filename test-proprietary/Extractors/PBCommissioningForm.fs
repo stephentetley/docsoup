@@ -80,7 +80,7 @@ module PBCommissioningForm =
     let process1 (fileName:string) : Document.Extractor<CommissionItem> = 
         Document.body &>> Body.table 0 &>> extractCommissionItem fileName
 
-    let processCommissionForm(filePath:string) : Answer<CommissionItem>  =
+    let processCommissionForm(filePath:string) : Result<CommissionItem, ErrMsg>  =
         let name = FileInfo(filePath).Name
         Document.runExtractor filePath (process1 name)
     

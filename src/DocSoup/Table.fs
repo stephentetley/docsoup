@@ -17,7 +17,7 @@ module Table =
 
     let (extractor:TableExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Table>()
 
-    type Extractor<'a> = ExtractMonad<Wordprocessing.Table,'a> 
+    type Extractor<'a> = ExtractMonad<'a, Wordprocessing.Table> 
 
 
 

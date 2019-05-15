@@ -15,10 +15,11 @@ module Document =
 
     let (extractor:DocumentExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Document>()
 
-    type Extractor<'a> = ExtractMonad<Wordprocessing.Document,'a> 
+    type Extractor<'a> = ExtractMonad<'a, Wordprocessing.Document> 
 
-    let runExtractor (filePath:string) (ma:Extractor<'a>) : Answer<'a> = 
+    let runExtractor (filePath:string) (ma:Extractor<'a>) : Result<'a, ErrMsg> = 
         runExtractMonad filePath (fun wpdocument -> wpdocument.MainDocumentPart.Document) ma
+
 
 
 

@@ -16,7 +16,7 @@ module Text =
 
     let (extractor:TextExtractorBuilder) = new ExtractMonadBuilder<string>()
 
-    type Extractor<'a> = ExtractMonad<string,'a> 
+    type Extractor<'a> = ExtractMonad<'a, string> 
 
     let contents : Extractor<string> = asks (fun text -> text)
 

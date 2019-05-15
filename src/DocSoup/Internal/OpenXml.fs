@@ -12,7 +12,7 @@ module OpenXml =
     open DocumentFormat.OpenXml.Wordprocessing
     
 
-    let primitiveExtract (fileName:string) (extract:WordprocessingDocument -> 'a)  : Result<'a,string> =
+    let primitiveExtract (fileName:string) (extract:WordprocessingDocument -> 'a)  : Result<'a, string> =
         if System.IO.File.Exists (fileName) then
             use wordDoc : WordprocessingDocument =  WordprocessingDocument.Open(path = fileName, isEditable = false)
             let ans = extract wordDoc

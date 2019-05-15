@@ -17,7 +17,7 @@ module Body =
 
     let (extractor:BodyExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Body>()
 
-    type Extractor<'a> = ExtractMonad<Wordprocessing.Body,'a> 
+    type Extractor<'a> = ExtractMonad<'a, Wordprocessing.Body> 
 
 
     let paragraphs : Extractor<seq<Wordprocessing.Paragraph>> = 

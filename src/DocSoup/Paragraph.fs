@@ -18,7 +18,7 @@ module Paragraph =
 
     let (extractor:ParagraphExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Paragraph>()
 
-    type Extractor<'a> = ExtractMonad<Wordprocessing.Paragraph,'a> 
+    type Extractor<'a> = ExtractMonad<'a, Wordprocessing.Paragraph> 
 
     let innerText : Extractor<string> = 
         asks (fun paragraph -> paragraph.InnerText)

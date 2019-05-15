@@ -52,5 +52,5 @@ module ErskineBatteryForm =
                                         , saiNumber = r1.SAI
                                         , outstationName = r1.Outstation ))
 
-    let processSiteWorks (filePath:string) : Answer<SiteWorksRow>  =
+    let processSiteWorks (filePath:string) : Result<SiteWorksRow, ErrMsg>  =
         Document.runExtractor filePath siteWorksExtractor

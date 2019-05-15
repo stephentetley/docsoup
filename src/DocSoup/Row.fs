@@ -18,7 +18,7 @@ module Row =
 
     let (extractor:RowExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.TableRow>()
 
-    type Extractor<'a> = ExtractMonad<Wordprocessing.TableRow,'a> 
+    type Extractor<'a> = ExtractMonad<'a, Wordprocessing.TableRow> 
 
     
     let cells : Extractor<seq<Wordprocessing.TableCell>> = 

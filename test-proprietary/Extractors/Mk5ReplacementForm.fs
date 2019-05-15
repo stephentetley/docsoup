@@ -102,7 +102,7 @@ module Mk5ReplacementForm =
                                             , maintenance = r4.Maintenance
                                             ))
 
-    let processMk5Install (filePath:string) : Answer<Mk5InstallRow>  =
+    let processMk5Install (filePath:string) : Result<Mk5InstallRow, ErrMsg>  =
         Document.runExtractor filePath mk5InstallExtractor
 
 
