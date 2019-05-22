@@ -65,8 +65,14 @@ module Cell =
                 |> Common.fromLines
         }
         
-
-
+    /// Get the cell "Paragraphs text lines"
+    let spacedText2 : Extractor<string []> = 
+        extractor { 
+            let! paras = asks (fun cell -> cell.Elements<Wordprocessing.Paragraph>())
+            return paras 
+                |> Seq.map (fun para1 -> para1.InnerText) 
+                |> Seq.toArray
+        }
 
 
 

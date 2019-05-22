@@ -16,6 +16,7 @@ open System.Text.RegularExpressions
 #load @"..\src\DocSoup\ExtractMonad.fs"
 #load @"..\src\DocSoup\Combinators.fs"
 #load @"..\src\DocSoup\Text.fs"
+#load @"..\src\DocSoup\Text2.fs"
 #load @"..\src\DocSoup\Paragraph.fs"
 #load @"..\src\DocSoup\Cell.fs"
 #load @"..\src\DocSoup\Row.fs"
@@ -38,28 +39,31 @@ let demo02 () =
     Document.runExtractor testDoc (Document.body &>> Body.innerText)
 
 
-let demo03a () : Answer<int> = 
+let demo03a () : Result<int, ErrMsg> = 
     Document.runExtractor testDoc (Document.body &>> Body.paragraphs &>> asks Seq.length)
 
-let demo03b () : Answer<int> = 
+let demo03b () : Result<int, ErrMsg> =  
     Document.runExtractor testDoc (Document.body &>> Body.tables &>> asks Seq.length)
 
 
 
-let demo04 () : Answer<string> = 
+let demo04 () : Result<string, ErrMsg> =
     Document.runExtractor testDoc 
         (Document.body &>> Body.table 0 &>> Table.row 0 &>> Row.innerText)
 
 
-let demo05a () : Answer<string> = 
+let demo05a () : Result<string, ErrMsg> =
     Document.runExtractor testDoc 
         (Document.body &>> Body.table 0 &>> Table.row 14 &>> Row.cell 0 &>> Cell.spacedText)
 
-let demo05b () : Answer<string> = 
+let demo05b () : Result<string, ErrMsg> =
     Document.runExtractor testDoc 
         (Document.body &>> Body.table 0 &>> Table.cell (14,0) &>> Cell.spacedText)
 
 
+let demo06 () : Result<string [], ErrMsg> =
+    Document.runExtractor testDoc 
+        (Document.body &>> Body.table 0 &>> Table.cell (14,0) &>> Cell.spacedText2 &>> Text2.contents)
 
 let dummy1 () = 
     List.forall (fun x -> x % 2 = 0) [2;4;6]
