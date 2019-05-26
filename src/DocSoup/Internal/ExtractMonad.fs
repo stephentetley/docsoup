@@ -171,6 +171,11 @@ module ExtractMonad =
         incrPosition () >>= fun _ ->
         mreturn ans
 
+    let lookAhead (parser:ExtractMonad<'ans, 'handle>) : ExtractMonad<'ans, 'handle> = 
+        ExtractMonad <| fun opts handle state -> 
+            match apply1 parser opts handle state with
+            | Ok (a, _) -> Ok (a, state)
+            | Error msg -> Error msg
 
 
     // ****************************************************
@@ -295,6 +300,20 @@ module ExtractMonad =
             work state0 (fun st ans -> Ok (ans, st))
 
 
+
+    /// CAUTION - without a notion of progress, this parser does not make sense.
+    let manyTillM (ma:ExtractMonad<'a, 'handle>) 
+                  (eos:ExtractMonad<'z, 'handle>) : ExtractMonad<'a list, 'handle> =
+        ExtractMonad <| fun opts handle state0 -> 
+            let rec work st cont = 
+                match apply1 eos opts handle st with
+                | Ok(_, st1) -> cont st1 []
+                | Error _ -> 
+                    match apply1 ma opts handle st with
+                    | Error msg -> cont st []
+                    | Ok (ans, st1) -> 
+                        work st1 (fun st2 acc -> cont st2 (ans::acc))
+            work state0 (fun st ans -> Ok (ans, st))
 
     let skipManyM (ma:ExtractMonad<'a, 'handle>) : ExtractMonad<unit, 'handle> =
         ExtractMonad <| fun opts handle state0 -> 

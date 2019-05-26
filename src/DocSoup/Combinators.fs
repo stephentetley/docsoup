@@ -322,3 +322,9 @@ module Combinators =
                     (msep:ExtractMonad<'sep, 'handle>) : ExtractMonad<'a list, 'handle> =
         seqL (sepBy1M ma msep) (ignoreM msep  <|> mreturn ())
 
+    let manyTill (parser: ExtractMonad<'a, 'handle>) 
+                 (ender: ExtractMonad<_, 'handle>) : ExtractMonad<'a list, 'handle> =
+        manyTillM parser ender
+
+        
+

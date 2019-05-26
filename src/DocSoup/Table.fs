@@ -81,7 +81,7 @@ module Table =
     let spacedText : Extractor<string> = 
         rowsSpacedText |>> Common.fromLines
 
-
+    let spacedText2 : Extractor<string []> = rowsSpacedText
 
     /// Find the string value in a two cell row.
     /// Cell 1 is considered the "name" field.

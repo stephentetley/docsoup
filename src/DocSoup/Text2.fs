@@ -34,16 +34,36 @@ module Text2 =
     let line : Extractor<string> = 
         consume1 "line read error" (fun ix arr -> arr.[ix])
 
+    let lines (count:int) : Extractor<string []> = 
+        consume1 "line read error" (fun ix arr -> arr.[ix .. ix+count])
 
-    ///// Caution - use only on text extracted with 'spacedText'.
-    ///// Text extracted with 'innerText' does not preserve line breaks.
-    //let lineCount : Extractor<int> =  
-    //    lines |>> Seq.length
+    let position : Extractor<int> = getPosition ()
 
-    ///// Caution - use only on text extracted with 'spacedText'.
-    ///// Text extracted with 'innerText' does not preserve line breaks.
-    //let firstLine : Extractor<string> = 
-    //    line 0 
+
+    /// Doesn't increase the cursor position.
+    let getInput : Extractor<string []> = 
+        peek "getInput" (fun ix arr -> arr.[ix ..])
+        
+
+
+    /// Caution - use only on text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let remainingLineCount : Extractor<int> =  
+        peek "getInput" (fun ix arr -> arr.Length - ix)
+
+
+    let satisfy (test:string -> bool) : Extractor<string> = 
+        extractor {
+            let! ans = line 
+            if test ans then 
+                return ans 
+            else 
+                return! extractError "satisfy"
+        }
+            
+    /// Note this works on the current line
+    let contains(value:string) : Extractor<string> = 
+        satisfy (fun str -> str.Contains(value))
 
     ///// Caution - use only on text extracted with 'spacedText'.
     ///// Text extracted with 'innerText' does not preserve line breaks.
@@ -77,76 +97,78 @@ module Text2 =
     //    contents |>> fun str -> str.Trim()
         
 
-    //// ****************************************************
-    //// Regex matching
+    // ****************************************************
+    // Regex matching
 
-    //let isMatch (pattern:string) : Extractor<bool> = 
-    //    extractor { 
-    //        let! input = contents 
-    //        let! regexOpts =  getRegexOptions ()
-    //        return Regex.IsMatch( input = input
-    //                            , pattern = pattern
-    //                            , options = regexOpts )
-    //    }
+    /// Does not consume input.
+    let isMatch (pattern:string) : Extractor<bool> = 
+        extractor { 
+            let! input = lookAhead line 
+            let! regexOpts =  getRegexOptions ()
+            return Regex.IsMatch( input = input
+                                , pattern = pattern
+                                , options = regexOpts )
+        }
+
+    /// Does not consume input.
+    let isNotMatch (pattern:string) : Extractor<bool> = 
+        isMatch pattern |>> not
+
+    /// Consumes input
+    let regexMatch (pattern:string) : Extractor<RegularExpressions.Match> =
+        extractor { 
+            let! input = line 
+            let! regexOpts =  getRegexOptions ()
+            return Regex.Match( input = input
+                            , pattern = pattern
+                            , options = regexOpts )
+        }
+
+    /// Consumes input
+    let matchValue (pattern:string) : Extractor<string> =
+        regexMatch pattern >>= fun matchObj -> 
+        if matchObj.Success then
+            mreturn matchObj.Value
+        else
+            extractError "no match"
 
 
-    //let isNotMatch (pattern:string) : Extractor<bool> = 
-    //    isMatch pattern |>> not
+    let matchGroups (pattern:string) : Extractor<RegularExpressions.GroupCollection> =
+        regexMatch pattern >>= fun matchObj -> 
+        if matchObj.Success then
+            mreturn matchObj.Groups
+        else
+            extractError "no match"
 
-
-    //let regexMatch (pattern:string) : Extractor<RegularExpressions.Match> =
-    //    extractor { 
-    //        let! input = contents 
-    //        let! regexOpts =  getRegexOptions ()
-    //        return Regex.Match( input = input
-    //                        , pattern = pattern
-    //                        , options = regexOpts )
-    //    }
-
-    //let matchValue (pattern:string) : Extractor<string> =
-    //    regexMatch pattern >>= fun matchObj -> 
-    //    if matchObj.Success then
-    //        mreturn matchObj.Value
-    //    else
-    //        extractError "no match"
-
-
-    //let matchGroups (pattern:string) : Extractor<RegularExpressions.GroupCollection> =
-    //    regexMatch pattern >>= fun matchObj -> 
-    //    if matchObj.Success then
-    //        mreturn matchObj.Groups
-    //    else
-    //        extractError "no match"
-
-    //let private isNumber (str:string) : bool = 
-    //    let pattern = "^\d+$"
-    //    Regex.IsMatch(input = str, pattern = pattern)
+    let private isNumber (str:string) : bool = 
+        let pattern = "^\d+$"
+        Regex.IsMatch(input = str, pattern = pattern)
         
-    ///// This only returns user named matches, not the 'internal' ones given 
-    ///// numeric names by .Net's regex library.
-    //let matchNamedMatches (pattern:string) : Extractor<Map<string, string>> =
-    //    regexMatch pattern >>= fun matchObj -> 
-    //    if matchObj.Success then
-    //        let nameValues = matchObj.Groups |> Seq.cast<Group> 
-    //        let matches = 
-    //            Seq.fold (fun acc (grp:Group) -> 
-    //                        if isNumber grp.Name then acc else Map.add grp.Name grp.Value acc)
-    //                    Map.empty
-    //                    nameValues
-    //        mreturn matches
-    //    else
-    //        extractError "no match"
+    /// This only returns user named matches, not the 'internal' ones given 
+    /// numeric names by .Net's regex library.
+    let matchNamedMatches (pattern:string) : Extractor<Map<string, string>> =
+        regexMatch pattern >>= fun matchObj -> 
+        if matchObj.Success then
+            let nameValues = matchObj.Groups |> Seq.cast<Group> 
+            let matches = 
+                Seq.fold (fun acc (grp:Group) -> 
+                            if isNumber grp.Name then acc else Map.add grp.Name grp.Value acc)
+                        Map.empty
+                        nameValues
+            mreturn matches
+        else
+            extractError "no match"
 
-    //let anyMatch (patterns:string []) : Extractor<bool> = 
-    //    let (predicates : Extractor<bool> list) = 
-    //        patterns |> Array.toList |> List.map isMatch
-    //    anyM predicates
+    let anyMatch (patterns:string []) : Extractor<bool> = 
+        let (predicates : Extractor<bool> list) = 
+            patterns |> Array.toList |> List.map isMatch
+        anyM predicates
 
 
-    //let allMatch (patterns:string []) : Extractor<bool> = 
-    //    let (predicates : Extractor<bool> list) = 
-    //        patterns |> Array.toList |> List.map isMatch
-    //    allM predicates
+    let allMatch (patterns:string []) : Extractor<bool> = 
+        let (predicates : Extractor<bool> list) = 
+            patterns |> Array.toList |> List.map isMatch
+        allM predicates
 
     //let matchStart (pattern:string) : Extractor<int> =
     //    regexMatch pattern >>= fun matchObj -> 
