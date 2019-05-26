@@ -23,7 +23,7 @@ open FSharp.Data
 
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
-#load @"..\src\DocSoup\ExtractMonad.fs"
+#load @"..\src\DocSoup\Internal\ExtractMonad.fs"
 #load @"..\src\DocSoup\Combinators.fs"
 #load @"..\src\DocSoup\Text.fs"
 #load @"..\src\DocSoup\Paragraph.fs"
@@ -49,7 +49,7 @@ let getOk (ans:Result<'a, ErrMsg>) : seq<'a> =
     | Error msg -> printfn "%s" msg; Seq.empty
 
 
-let processSurvey (path:string) : Answer<UsarSurveyRow> = 
+let processSurvey (path:string) : Result<UsarSurveyRow, ErrMsg> = 
     match SurveyV2.processUsarSurvey path with
     | Ok ans -> Ok ans
     | Error _ -> SurveyV1.processUsarSurvey path

@@ -23,7 +23,7 @@ open FSharp.Data
 
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
-#load @"..\src\DocSoup\ExtractMonad.fs"
+#load @"..\src\DocSoup\Internal\ExtractMonad.fs"
 #load @"..\src\DocSoup\Combinators.fs"
 #load @"..\src\DocSoup\Text.fs"
 #load @"..\src\DocSoup\Paragraph.fs"
@@ -95,7 +95,7 @@ let demo02 (pattern:string)  =
 
 let demo03 (number:int)  = 
     let proc () = 
-        findM (fun ix -> mreturn (ix = number)) [1;2;3;4;5]
+        DocSoup.Internal.ExtractMonad.findM (fun ix -> mreturn (ix = number)) [1;2;3;4;5]
     Document.runExtractor sampleFile (proc ())
 
 let demo04 ()  = 

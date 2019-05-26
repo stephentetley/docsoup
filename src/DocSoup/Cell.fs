@@ -12,6 +12,7 @@ module Cell =
     open DocumentFormat.OpenXml
 
     open DocSoup.Internal
+    open DocSoup.Internal.ExtractMonad
     open DocSoup
 
     type CellExtractorBuilder = ExtractMonadBuilder<Wordprocessing.TableCell> 

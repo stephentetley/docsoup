@@ -23,7 +23,7 @@ open FSharp.Data
 
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
-#load @"..\src\DocSoup\ExtractMonad.fs"
+#load @"..\src\DocSoup\Internal\ExtractMonad.fs"
 #load @"..\src\DocSoup\Combinators.fs"
 #load @"..\src\DocSoup\Text.fs"
 #load @"..\src\DocSoup\Paragraph.fs"

@@ -11,7 +11,7 @@ module Body =
 
     open DocumentFormat.OpenXml
 
-    open DocSoup
+    open DocSoup.Internal.ExtractMonad
 
     type BodyExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Body> 
 

@@ -7,7 +7,7 @@
   <ItemGroup>
     <Compile Include="DocSoup\Internal\Common.fs" />
     <Compile Include="DocSoup\Internal\OpenXml.fs" />
-    <Compile Include="DocSoup\ExtractMonad.fs" />
+    <Compile Include="DocSoup\Internal\ExtractMonad.fs" />
     <Compile Include="DocSoup\Combinators.fs" />
     <Compile Include="DocSoup\Text.fs" />
     <Compile Include="DocSoup\Text2.fs" />

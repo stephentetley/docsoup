@@ -1,9 +1,9 @@
 ﻿// Copyright (c) Stephen Tetley 2019
 // License: BSD 3 Clause
 
-namespace DocSoup
+namespace DocSoup.Internal
 
-[<AutoOpen>]
+
 module ExtractMonad = 
     
     open System.Text.RegularExpressions
@@ -145,15 +145,36 @@ module ExtractMonad =
         selector >>= fun newHandle -> 
         focus newHandle ma
 
-    /// Operator for focusM.
-    /// Chain a _selector_ and an _extractor_.
-    let ( &>> ) (selector:ExtractMonad<'handle2, 'handle1>)
-                (ma:ExtractMonad<'a, 'handle2>) : ExtractMonad<'a, 'handle1> = 
-        focusM selector ma
+
+    // ****************************************************
+    // State operations
+
+    let getPosition () : ExtractMonad<int, 'handle> = 
+        ExtractMonad <| fun opts handle state -> 
+            Ok (state, state)
+
+
+    let incrPosition () : ExtractMonad<unit, 'handle> = 
+        ExtractMonad <| fun opts handle state -> 
+            let state1 = state + 1 in Ok ((), state1)
+
+    let peek (errMsg:ErrMsg) (getter: State -> 'handle -> 'ans) : ExtractMonad<'ans, 'handle> = 
+        ExtractMonad <| fun _ handle state -> 
+            try 
+                let ans = getter state handle 
+                Ok (ans, state)
+            with
+            | _ -> Error errMsg
+
+    let consume1 (errMsg:ErrMsg) (getter:State -> 'handle -> 'ans) : ExtractMonad<'ans, 'handle> = 
+        peek errMsg getter >>= fun ans -> 
+        incrPosition () >>= fun _ ->
+        mreturn ans
+
 
 
     // ****************************************************
-    // Monadic operations
+    // Regex options
 
     let getRegexOptions () : ExtractMonad<RegexOptions, 'handle> = 
         ExtractMonad <| fun opts _ state -> Ok (opts, state)
@@ -163,8 +184,7 @@ module ExtractMonad =
         ExtractMonad <| fun opts handle state-> 
             apply1 ma (modify opts) handle state
 
-    let ignoreCase (ma: ExtractMonad<'a, 'handle>) : ExtractMonad<'a, 'handle> = 
-        localOptions (fun opts -> RegexOptions.IgnoreCase ||| opts) ma
+
 
     // ****************************************************
     // Monadic operations

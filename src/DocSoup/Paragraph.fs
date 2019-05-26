@@ -11,7 +11,7 @@ module Paragraph =
 
     open DocumentFormat.OpenXml
 
-    open DocSoup.Internal
+    open DocSoup.Internal.ExtractMonad
     open DocSoup
 
     type ParagraphExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Paragraph> 

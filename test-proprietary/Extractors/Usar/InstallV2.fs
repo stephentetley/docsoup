@@ -50,5 +50,5 @@ module InstallV2 =
                                             , installDate = r2.InstallDate
                                             ))
 
-    let processUsarInstall (filePath:string) : Answer<UsarInstallRow>  =
+    let processUsarInstall (filePath:string) : Result<UsarInstallRow, ErrMsg>  =
         Document.runExtractor filePath usarInstallExtractor

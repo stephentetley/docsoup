@@ -6,8 +6,24 @@ namespace DocSoup
 [<AutoOpen>]
 module Combinators = 
 
+    open System.Text.RegularExpressions
 
-    open DocSoup
+    open DocSoup.Internal.ExtractMonad
+
+    type ErrMsg = DocSoup.Internal.ExtractMonad.ErrMsg
+    
+    let mreturn = DocSoup.Internal.ExtractMonad.mreturn
+
+    let runExtractMonad = DocSoup.Internal.ExtractMonad.runExtractMonad
+
+    /// Operator for focusM.
+    /// Chain a _selector_ and an _extractor_.
+    let ( &>> ) (selector:ExtractMonad<'handle2, 'handle1>)
+                (ma:ExtractMonad<'a, 'handle2>) : ExtractMonad<'a, 'handle1> = 
+        focusM selector ma
+
+    let ignoreCase (ma: ExtractMonad<'a, 'handle>) : ExtractMonad<'a, 'handle> = 
+        localOptions (fun opts -> RegexOptions.IgnoreCase ||| opts) ma
 
     /// Operator for fmap.
     let ( |>> ) (ma:ExtractMonad<'a, 'handle>) (fn:'a -> 'b) : ExtractMonad<'b, 'handle> = 

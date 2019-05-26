@@ -11,8 +11,9 @@ module Row =
 
     open DocumentFormat.OpenXml
 
-    open DocSoup
     open DocSoup.Internal
+    open DocSoup.Internal.ExtractMonad
+    open DocSoup
 
     type RowExtractorBuilder = ExtractMonadBuilder<Wordprocessing.TableRow> 
 

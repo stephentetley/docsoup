@@ -65,6 +65,6 @@ module SurveyV1 =
                                             , surveyDate = r2.SurveyDate
                                             ))
 
-    let processUsarSurvey (filePath:string) : Answer<UsarSurveyRow>  =
+    let processUsarSurvey (filePath:string) : Result<UsarSurveyRow, ErrMsg>  =
         Document.runExtractor filePath usarSurveyExtractor
 

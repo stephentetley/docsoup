@@ -9,7 +9,7 @@ module Text2 =
     open System.Text
     open System.Text.RegularExpressions
 
-    open DocSoup.Internal
+    open DocSoup.Internal.ExtractMonad
     open DocSoup
 
     type TextExtractorBuilder = ExtractMonadBuilder<string []> 
@@ -18,16 +18,22 @@ module Text2 =
 
     type Extractor<'a> = ExtractMonad<'a, string []> 
 
-    let contents : Extractor<string []> = asks (fun text -> text)
+    let private contents : Extractor<string []> = asks (fun text -> text)
 
 
-    ///// Caution - use with text extracted with 'spacedText'.
-    ///// Text extracted with 'innerText' does not preserve line breaks.
-    //let line (index:int) : Extractor<string> = 
-    //    extractor { 
-    //        let! xs = lines
-    //        return! liftOption (Seq.tryItem index xs)
-    //    }
+    let endOfInput : Extractor<unit> = 
+        extractor { 
+            match! peek "" (fun pos arr -> pos > arr.Length) with
+            | true -> return ()
+            | false -> do! extractError "end of input"
+        }
+
+
+    /// Caution - use with text extracted with 'spacedText'.
+    /// Text extracted with 'innerText' does not preserve line breaks.
+    let line : Extractor<string> = 
+        consume1 "line read error" (fun ix arr -> arr.[ix])
+
 
     ///// Caution - use only on text extracted with 'spacedText'.
     ///// Text extracted with 'innerText' does not preserve line breaks.

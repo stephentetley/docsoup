@@ -9,7 +9,7 @@ module Document =
     open System.Text
     open DocumentFormat.OpenXml
 
-    open DocSoup
+    open DocSoup.Internal.ExtractMonad
 
     type DocumentExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Document> 
 

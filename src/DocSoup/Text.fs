@@ -10,6 +10,7 @@ module Text =
     open System.Text.RegularExpressions
 
     open DocSoup.Internal
+    open DocSoup.Internal.ExtractMonad
     open DocSoup
 
     type TextExtractorBuilder = ExtractMonadBuilder<string> 

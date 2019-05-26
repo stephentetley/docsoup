@@ -13,7 +13,7 @@ open System.Text.RegularExpressions
 
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
-#load @"..\src\DocSoup\ExtractMonad.fs"
+#load @"..\src\DocSoup\Internal\ExtractMonad.fs"
 #load @"..\src\DocSoup\Combinators.fs"
 #load @"..\src\DocSoup\Text.fs"
 #load @"..\src\DocSoup\Text2.fs"
@@ -23,6 +23,7 @@ open System.Text.RegularExpressions
 #load @"..\src\DocSoup\Table.fs"
 #load @"..\src\DocSoup\Body.fs"
 #load @"..\src\DocSoup\Document.fs"
+open DocSoup.Internal.ExtractMonad          // TEMP
 open DocSoup
 
 let localFile (fileName:string) : string = 
@@ -60,10 +61,9 @@ let demo05b () : Result<string, ErrMsg> =
     Document.runExtractor testDoc 
         (Document.body &>> Body.table 0 &>> Table.cell (14,0) &>> Cell.spacedText)
 
-
-let demo06 () : Result<string [], ErrMsg> =
+let demo06 () : Result<string, ErrMsg> =
     Document.runExtractor testDoc 
-        (Document.body &>> Body.table 0 &>> Table.cell (14,0) &>> Cell.spacedText2 &>> Text2.contents)
+        (Document.body &>> Body.table 0 &>> Table.cell (14,0) &>> Cell.spacedText2 &>> Text2.line)
 
 let dummy1 () = 
     List.forall (fun x -> x % 2 = 0) [2;4;6]

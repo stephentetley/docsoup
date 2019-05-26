@@ -6,12 +6,12 @@ namespace DocSoup
 [<RequireQualifiedAccess>]
 module Table = 
     
-    open System.Text
-
     open DocumentFormat.OpenXml
 
-    open DocSoup
+    
     open DocSoup.Internal
+    open DocSoup.Internal.ExtractMonad
+    open DocSoup
 
     type TableExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Table> 
 
