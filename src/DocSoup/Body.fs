@@ -13,6 +13,8 @@ module Body =
 
     open DocSoup.Internal.ExtractMonad
 
+    /// Body should allow random access to Paragraphs and Tables
+
     type BodyExtractorBuilder = ExtractMonadBuilder<Wordprocessing.Body> 
 
     let (extractor:BodyExtractorBuilder) = new ExtractMonadBuilder<Wordprocessing.Body>()

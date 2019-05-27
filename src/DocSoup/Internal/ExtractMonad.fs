@@ -22,11 +22,11 @@ module ExtractMonad =
 
     // To consider - maybe regex search options should go in the monad?
     type ExtractMonad<'a, 'handle> = 
-        ExtractMonad of (RegexOptions -> 'handle -> State -> Answer<'a>)
+        internal ExtractMonad of (RegexOptions -> 'handle -> State -> Answer<'a>)
         
 
 
-    let inline private apply1 (ma: ExtractMonad<'a, 'handle>)
+    let inline internal apply1 (ma: ExtractMonad<'a, 'handle>)
                               (options: RegexOptions)
                               (handle: 'handle) 
                               (state:State) : Answer<'a>= 
@@ -158,16 +158,16 @@ module ExtractMonad =
         ExtractMonad <| fun opts handle state -> 
             let state1 = state + 1 in Ok ((), state1)
 
-    let peek (errMsg:ErrMsg) (getter: State -> 'handle -> 'ans) : ExtractMonad<'ans, 'handle> = 
+    let peek (getter: State -> 'handle -> 'ans) : ExtractMonad<'ans, 'handle> = 
         ExtractMonad <| fun _ handle state -> 
             try 
                 let ans = getter state handle 
                 Ok (ans, state)
             with
-            | _ -> Error errMsg
+            | _ -> Error "peek"
 
-    let consume1 (errMsg:ErrMsg) (getter:State -> 'handle -> 'ans) : ExtractMonad<'ans, 'handle> = 
-        peek errMsg getter >>= fun ans -> 
+    let consume1 (getter:State -> 'handle -> 'ans) : ExtractMonad<'ans, 'handle> = 
+        peek getter >>= fun ans -> 
         incrPosition () >>= fun _ ->
         mreturn ans
 

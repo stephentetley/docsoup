@@ -14,6 +14,7 @@ open System.Text.RegularExpressions
 #load @"..\src\DocSoup\Internal\Common.fs"
 #load @"..\src\DocSoup\Internal\OpenXml.fs"
 #load @"..\src\DocSoup\Internal\ExtractMonad.fs"
+#load @"..\src\DocSoup\Internal\Consume.fs"
 #load @"..\src\DocSoup\Combinators.fs"
 #load @"..\src\DocSoup\Text.fs"
 #load @"..\src\DocSoup\Text2.fs"
@@ -38,7 +39,7 @@ let demo01 () : Result<_, ErrMsg> =
 
 let demo02 () : Result<_, ErrMsg> =
     Document.runExtractor testDoc 
-        (Document.body &>> Body.table 0 &>> Table.spacedText2 &>> manyTill Text2.line (Text2.contains "Site Name"))
+        (Document.body &>> Body.table 0 &>> Table.spacedText2 &>> manyTill Text2.getItem (Text2.contains "Site Name"))
 
 let dummy1 () = 
     "Hello".Contains("llo")

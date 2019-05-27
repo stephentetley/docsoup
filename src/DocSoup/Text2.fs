@@ -10,6 +10,7 @@ module Text2 =
     open System.Text.RegularExpressions
 
     open DocSoup.Internal.ExtractMonad
+    open DocSoup.Internal.Consume
     open DocSoup
 
     type TextExtractorBuilder = ExtractMonadBuilder<string []> 
@@ -20,58 +21,42 @@ module Text2 =
 
     let private contents : Extractor<string []> = asks (fun text -> text)
 
+    let internal textConsume = makeConsumeModule ()
 
-    let endOfInput : Extractor<unit> = 
-        extractor { 
-            match! peek "" (fun pos arr -> pos > arr.Length) with
-            | true -> return ()
-            | false -> do! extractError "end of input"
-        }
+
+    let endOfInput : Extractor<unit> = textConsume.EndOfInput
 
 
     /// Caution - use with text extracted with 'spacedText'.
     /// Text extracted with 'innerText' does not preserve line breaks.
-    let line : Extractor<string> = 
-        consume1 "line read error" (fun ix arr -> arr.[ix])
+    let getItem : Extractor<string> = textConsume.GetItem
 
-    let lines (count:int) : Extractor<string []> = 
-        consume1 "line read error" (fun ix arr -> arr.[ix .. ix+count])
+    let getItems (count:int) : Extractor<string []> = textConsume.GetItems count
 
-    let position : Extractor<int> = getPosition ()
+    let position : Extractor<int> = textConsume.Position
 
 
     /// Doesn't increase the cursor position.
-    let getInput : Extractor<string []> = 
-        peek "getInput" (fun ix arr -> arr.[ix ..])
+    let getInput : Extractor<string []> = textConsume.GetInput
         
 
 
     /// Caution - use only on text extracted with 'spacedText'.
     /// Text extracted with 'innerText' does not preserve line breaks.
-    let remainingLineCount : Extractor<int> =  
-        peek "getInput" (fun ix arr -> arr.Length - ix)
+    let inputCount : Extractor<int> = textConsume.InputCount
 
 
-    let satisfy (test:string -> bool) : Extractor<string> = 
-        extractor {
-            let! ans = line 
-            if test ans then 
-                return ans 
-            else 
-                return! extractError "satisfy"
-        }
+    let satisfy (test:string -> bool) : Extractor<string> = textConsume.Satisfy test
             
     /// Note this works on the current line
-    let contains(value:string) : Extractor<string> = 
+    let contains (value:string) : Extractor<string> = 
         satisfy (fun str -> str.Contains(value))
 
-    ///// Caution - use only on text extracted with 'spacedText'.
-    ///// Text extracted with 'innerText' does not preserve line breaks.
-    //let findLine (predicate:Extractor<bool>) : Extractor<string> = 
-    //    extractor { 
-    //        let! xs = lines |>> Seq.toList
-    //        return! findM (fun line1 -> focus line1 predicate) xs
-    //    }
+    let startsWith (value:string) : Extractor<string> = 
+        satisfy (fun str -> str.StartsWith(value))
+    
+    let endsWith (value:string) : Extractor<string> = 
+        satisfy (fun str -> str.EndsWith(value))
 
     ///// Caution - use only on text extracted with 'spacedText'.
     ///// Text extracted with 'innerText' does not preserve line breaks.
@@ -103,7 +88,7 @@ module Text2 =
     /// Does not consume input.
     let isMatch (pattern:string) : Extractor<bool> = 
         extractor { 
-            let! input = lookAhead line 
+            let! input = lookAhead getItem 
             let! regexOpts =  getRegexOptions ()
             return Regex.IsMatch( input = input
                                 , pattern = pattern
@@ -117,7 +102,7 @@ module Text2 =
     /// Consumes input
     let regexMatch (pattern:string) : Extractor<RegularExpressions.Match> =
         extractor { 
-            let! input = line 
+            let! input = getItem 
             let! regexOpts =  getRegexOptions ()
             return Regex.Match( input = input
                             , pattern = pattern

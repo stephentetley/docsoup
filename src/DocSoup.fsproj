@@ -8,13 +8,18 @@
     <Compile Include="DocSoup\Internal\Common.fs" />
     <Compile Include="DocSoup\Internal\OpenXml.fs" />
     <Compile Include="DocSoup\Internal\ExtractMonad.fs" />
+    <Compile Include="DocSoup\Internal\Consume.fs" />
     <Compile Include="DocSoup\Combinators.fs" />
     <Compile Include="DocSoup\Text.fs" />
     <Compile Include="DocSoup\Text2.fs" />
     <Compile Include="DocSoup\Paragraph.fs" />
+    <Compile Include="DocSoup\Paragraphs.fs" />
     <Compile Include="DocSoup\Cell.fs" />
+    <Compile Include="DocSoup\Cells.fs" />
     <Compile Include="DocSoup\Row.fs" />
+    <Compile Include="DocSoup\Rows.fs" />
     <Compile Include="DocSoup\Table.fs" />
+    <Compile Include="DocSoup\Tables.fs" />
     <Compile Include="DocSoup\Body.fs" />
     <Compile Include="DocSoup\Document.fs" />
   </ItemGroup>
